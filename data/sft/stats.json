@@ -1,0 +1,30 @@
+{
+  "verified_ok": 544,
+  "kept": 385,
+  "train": 347,
+  "val": 38,
+  "dropped": {
+    "context chunk trimmed": 40,
+    "too long": 3,
+    "near duplicate": 152,
+    "eval leakage": 4
+  },
+  "by_category": {
+    "concept": 122,
+    "code_write": 55,
+    "multiturn": 14,
+    "trace": 53,
+    "bug_find": 84,
+    "not_covered": 29,
+    "meta": 28
+  },
+  "by_variant": {
+    "distractor": 3,
+    "no_context": 2,
+    "standard": 6,
+    "code_write": 1,
+    "external": 152,
+    "external_no_context": 221
+  },
+  "tokens_p95": 1946
+}

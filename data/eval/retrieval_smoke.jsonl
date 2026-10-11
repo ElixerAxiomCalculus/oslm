@@ -1,0 +1,30 @@
+{"question": "What is a race condition?", "gold_url_contains": ["Race_condition", "threads-intro"]}
+{"question": "Why can count++ executed by two threads lose an update?", "gold_url_contains": ["threads-intro", "Race_condition"]}
+{"question": "What are the three requirements for a solution to the critical section problem?", "gold_url_contains": ["Critical_section", "Peterson", "threads-locks"]}
+{"question": "How does Peterson's algorithm guarantee mutual exclusion with the flag and turn variables?", "gold_url_contains": ["Peterson"]}
+{"question": "How does Dekker's algorithm work for two processes?", "gold_url_contains": ["Dekker"]}
+{"question": "How can test-and-set be used to build a spin lock?", "gold_url_contains": ["Test-and-set", "threads-locks", "Spinlock"]}
+{"question": "What does compare-and-swap do atomically?", "gold_url_contains": ["Compare-and-swap", "threads-locks"]}
+{"question": "Why do spinlocks waste CPU time and when are they appropriate?", "gold_url_contains": ["Spinlock", "threads-locks", "pthread_spin_lock"]}
+{"question": "What is the difference between a counting semaphore and a binary semaphore?", "gold_url_contains": ["Semaphore_(programming)", "threads-sema", "LittleBook", "sem_overview"]}
+{"question": "What do the P and V (wait and signal) operations on a semaphore do?", "gold_url_contains": ["Semaphore_(programming)", "threads-sema", "LittleBook"]}
+{"question": "How do you initialise an unnamed POSIX semaphore shared between threads?", "gold_url_contains": ["sem_init", "sem_overview"]}
+{"question": "What happens when sem_wait is called on a semaphore whose value is zero?", "gold_url_contains": ["sem_wait", "threads-sema"]}
+{"question": "Which function increments a POSIX semaphore and wakes a waiting thread?", "gold_url_contains": ["sem_post"]}
+{"question": "Why must pthread_cond_wait be called inside a while loop?", "gold_url_contains": ["threads-cv", "pthread_cond_timedwait", "Monitor_(synchronization)"]}
+{"question": "What does pthread_cond_signal do if no thread is waiting?", "gold_url_contains": ["pthread_cond_signal", "threads-cv"]}
+{"question": "What does pthread_mutex_lock do if the mutex is already locked by another thread?", "gold_url_contains": ["pthread_mutex_lock", "threads-api", "threads-locks"]}
+{"question": "How do you statically initialise a pthread mutex?", "gold_url_contains": ["pthread_mutex_init", "threads-api"]}
+{"question": "How do you create a thread and wait for it to finish with pthreads?", "gold_url_contains": ["pthread_create", "pthread_join", "threads-api"]}
+{"question": "Solve the bounded-buffer producer-consumer problem with semaphores", "gold_url_contains": ["Producer", "threads-sema", "threads-cv", "LittleBook"]}
+{"question": "What are the first and second readers-writers problems?", "gold_url_contains": ["Readers", "threads-sema", "LittleBook", "pthread_rwlock"]}
+{"question": "How does a read-write lock allow multiple readers?", "gold_url_contains": ["pthread_rwlock", "Readers", "threads-sema"]}
+{"question": "How can the dining philosophers problem deadlock and how do you prevent it?", "gold_url_contains": ["Dining_philosophers", "threads-sema", "LittleBook"]}
+{"question": "Explain the sleeping barber problem", "gold_url_contains": ["Sleeping_barber", "LittleBook"]}
+{"question": "What are the four necessary conditions for deadlock?", "gold_url_contains": ["Deadlock", "threads-bugs"]}
+{"question": "How does lock ordering prevent deadlock?", "gold_url_contains": ["threads-bugs", "Deadlock", "Dining_philosophers"]}
+{"question": "What are atomicity-violation and order-violation bugs?", "gold_url_contains": ["threads-bugs"]}
+{"question": "What is priority inversion and how does priority inheritance fix it?", "gold_url_contains": ["Priority_inversion"]}
+{"question": "What is a monitor and how does it relate to condition variables?", "gold_url_contains": ["Monitor_(synchronization)", "threads-cv"]}
+{"question": "How do you build a concurrent counter or linked list with locks?", "gold_url_contains": ["threads-locks-usage"]}
+{"question": "What is mutual exclusion and why is it needed?", "gold_url_contains": ["Mutual_exclusion", "Critical_section", "threads-locks"]}

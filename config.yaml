@@ -1,0 +1,90 @@
+seed: 42
+setup: base_rag  # base | base_rag | ft | ft_rag  (base_rag scored best in the 2026-10-11 evaluation)
+
+paths:
+  course: data/course
+  raw: data/raw
+  cache: data/cache
+  chunks: data/chunks
+  chroma: data/chroma
+  sft: data/sft
+  eval: data/eval
+  models: models
+  logs: logs
+  sources_csv: sources.csv
+
+wsl:
+  distro: Ubuntu
+  checker_timeout_s: 30
+  max_source_bytes: 20480
+
+ollama:
+  url: http://localhost:11434
+  base_tag: qwen3:4b-instruct-2507-q4_K_M
+  ft_tag: oslm-ft
+  num_ctx: 8192
+
+models:
+  hf_base: Qwen/Qwen3-4B-Instruct-2507
+  hf_fallback: Qwen/Qwen3-8B  # config switch only, not used by default
+  embedder: BAAI/bge-large-en-v1.5
+  reranker: BAAI/bge-reranker-base
+  bge_query_instruction: "Represent this sentence for searching relevant passages: "
+
+crawler:
+  user_agent: "OSlm-course-crawler/0.1 (educational project; contact: sayakmondal10@gmail.com)"
+  delay_s: 1.0
+  retries: 3
+  timeout_s: 20
+
+chunking:
+  target_tokens: 450
+  overlap_tokens: 60
+
+retrieval:
+  top_k: 20
+  rerank_k: 4
+  relevance_threshold: 0.30  # calibrated 2026-10-10: covered min 0.62, uncovered topics < 0.31 (see oslm.index.smoke.calibrate_threshold)
+  collection: oslm
+
+decoding:
+  temperature: 0.2
+  top_p: 0.9
+  repeat_penalty: 1.05
+  max_tokens: 1200
+  max_tokens_code: 2000
+
+api:
+  host: 127.0.0.1
+  port: 8000
+  cors_origins: ["http://localhost:5173", "http://127.0.0.1:5173"]
+  max_message_chars: 8000
+
+sft:
+  # ollama = local qwen3:8b (no quota); gemini = free Flash models (20 requests/model/day)
+  provider: ollama
+  local_model: qwen3:8b
+  target_total: 1200
+  not_in_context_frac: 0.15
+  dedup_cosine: 0.92
+  val_frac: 0.1
+  context_chunks: 3
+
+train:
+  lora_r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+  max_seq_length: 2048  # brief fallback: 3072 peaked at 8.7 GB reserved (> 7.5 GB) and spilled to shared memory
+  batch_size: 1
+  grad_accum: 16
+  lr: 2.0e-4
+  warmup_ratio: 0.03
+  epochs: 2
+  eval_steps: 50
+  save_steps: 100
+  vram_limit_gb: 7.5
+
+eval:
+  # auto = free Gemini Flash if it has quota today, else local qwen3:8b; or force gemini | ollama
+  judge: ollama  # 2026-10-11: free Gemini quota exhausted; one local judge (qwen3:8b) scores all four setups

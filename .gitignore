@@ -1,0 +1,54 @@
+# secrets
+.env
+
+# python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest_tmp/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# node / frontend
+node_modules/
+web/dist/
+web/playwright-report/
+web/test-results/
+web/blob-report/
+playwright-report/
+test-results/
+
+# data (copyrighted or regenerable)
+data/course/*
+!data/course/.gitkeep
+data/raw/
+data/chunks/
+data/chroma/
+data/cache/
+.hf_cache/
+
+# models and tools
+models/**
+!models/**/
+!models/**/Modelfile
+!models/README.md
+tools/
+*.gguf
+*.safetensors
+*.bin
+
+# logs
+logs/
+*.log
+
+# OS / editors
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+CONTEXT.md

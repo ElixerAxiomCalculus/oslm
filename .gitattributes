@@ -1,0 +1,7 @@
+* text=auto
+*.sh text eol=lf
+*.c text eol=lf
+*.png binary
+*.pdf binary
+*.pptx binary
+tests/fixtures/c/crlf_unicode.c -text

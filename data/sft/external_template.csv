@@ -1,0 +1,57 @@
+category,question,answer,has_bug
+concept,What is a race condition?,"Picture two people editing the same shared document at once: whoever saves last silently wipes out the other's change.
+
+A **race condition** happens when the result of a program depends on the timing (interleaving) of threads that access shared data, and at least one of them writes it.
+
+Example: two threads each run `count++` on `count = 5`. Each loads 5, adds 1 and stores 6, so one increment is lost and the final value is 6 instead of 7.
+
+Common misconception: a single line like `count++` is atomic. It is really load, add, store.
+
+Check your understanding: if both threads only *read* `count`, can a race condition occur?",
+bug_find,"Is this correct?
+```c
+#include <pthread.h>
+#include <stdio.h>
+static int balance = 100;
+static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+void *withdraw(void *arg) {
+    int amount = *(int *)arg;
+    pthread_mutex_lock(&m);
+    if (balance < amount)
+        return NULL;
+    balance -= amount;
+    pthread_mutex_unlock(&m);
+    return NULL;
+}
+int main(void) {
+    pthread_t a, b;
+    int x = 150, y = 30;
+    pthread_create(&a, NULL, withdraw, &x);
+    pthread_create(&b, NULL, withdraw, &y);
+    pthread_join(a, NULL);
+    pthread_join(b, NULL);
+    printf(""%d\n"", balance);
+    return 0;
+}
+```","Verdict: bug found
+
+The early `return NULL;` inside the `if` leaves the function while still holding `m`.
+
+| Step | Thread A (x = 150) | Thread B (y = 30) | Shared state |
+|---|---|---|---|
+| 1 | lock(m) | | m held by A |
+| 2 | balance < 150, return without unlock | | m still held |
+| 3 | | lock(m) blocks forever | deadlock |
+
+Fix:
+```diff
+-    if (balance < amount)
+-        return NULL;
++    if (balance < amount) {
++        pthread_mutex_unlock(&m);
++        return NULL;
++    }
+```
+
+Every path out of the critical section now runs the exit section, so the other thread can always acquire `m`.",true
+os_out_of_scope,Explain round-robin scheduling,"I focus on process synchronization, so I'll keep this short: round-robin gives each ready process a fixed time slice in turn. The synchronization angle is that a time-slice expiry can preempt a thread in the middle of its critical section, which is exactly why we need locks. Want to see how a preempted `count++` loses an update?",

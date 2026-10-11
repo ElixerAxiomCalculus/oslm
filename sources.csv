@@ -1,0 +1,37 @@
+url,source_name,type,license,trust_tier,max_depth,path_prefix,topic_tags
+https://man.archlinux.org/man/pthread_create.3.en,Linux man-pages (via man.archlinux.org),html,man-pages license (verbatim copying permitted),1,0,/man/,threads;pthread_create
+https://man.archlinux.org/man/pthread_join.3.en,Linux man-pages (via man.archlinux.org),html,man-pages license (verbatim copying permitted),1,0,/man/,threads;pthread_join
+https://man.archlinux.org/man/pthread_mutex_lock.3p.en,POSIX man-pages (via man.archlinux.org),html,IEEE/The Open Group (redistribution permitted with notice),1,0,/man/,mutex;pthread_mutex_lock
+https://man.archlinux.org/man/pthread_mutex_init.3p.en,POSIX man-pages (via man.archlinux.org),html,IEEE/The Open Group (redistribution permitted with notice),1,0,/man/,mutex;pthread_mutex_init
+https://man.archlinux.org/man/pthread_cond_timedwait.3p.en,POSIX man-pages (via man.archlinux.org),html,IEEE/The Open Group (redistribution permitted with notice),1,0,/man/,condition-variable;pthread_cond_wait
+https://man.archlinux.org/man/pthread_cond_signal.3p.en,POSIX man-pages (via man.archlinux.org),html,IEEE/The Open Group (redistribution permitted with notice),1,0,/man/,condition-variable;pthread_cond_signal
+https://man.archlinux.org/man/sem_overview.7.en,Linux man-pages (via man.archlinux.org),html,man-pages license (verbatim copying permitted),1,0,/man/,semaphore;sem_overview
+https://man.archlinux.org/man/sem_init.3.en,Linux man-pages (via man.archlinux.org),html,man-pages license (verbatim copying permitted),1,0,/man/,semaphore;sem_init
+https://man.archlinux.org/man/sem_wait.3.en,Linux man-pages (via man.archlinux.org),html,man-pages license (verbatim copying permitted),1,0,/man/,semaphore;sem_wait
+https://man.archlinux.org/man/sem_post.3.en,Linux man-pages (via man.archlinux.org),html,man-pages license (verbatim copying permitted),1,0,/man/,semaphore;sem_post
+https://man.archlinux.org/man/pthread_rwlock_rdlock.3p.en,POSIX man-pages (via man.archlinux.org),html,IEEE/The Open Group (redistribution permitted with notice),1,0,/man/,readers-writers;rwlock
+https://man.archlinux.org/man/pthread_spin_lock.3.en,Linux man-pages (via man.archlinux.org),html,man-pages license (verbatim copying permitted),1,0,/man/,spinlock;pthread_spin_lock
+https://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf,OSTEP,pdf,Free online textbook (Arpaci-Dusseau),1,0,/~remzi/OSTEP/,threads;race-condition;critical-section
+https://pages.cs.wisc.edu/~remzi/OSTEP/threads-api.pdf,OSTEP,pdf,Free online textbook (Arpaci-Dusseau),1,0,/~remzi/OSTEP/,threads;pthread-api
+https://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks.pdf,OSTEP,pdf,Free online textbook (Arpaci-Dusseau),1,0,/~remzi/OSTEP/,locks;spinlock;test-and-set;compare-and-swap;peterson
+https://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks-usage.pdf,OSTEP,pdf,Free online textbook (Arpaci-Dusseau),1,0,/~remzi/OSTEP/,locks;concurrent-data-structures
+https://pages.cs.wisc.edu/~remzi/OSTEP/threads-cv.pdf,OSTEP,pdf,Free online textbook (Arpaci-Dusseau),1,0,/~remzi/OSTEP/,condition-variable;producer-consumer
+https://pages.cs.wisc.edu/~remzi/OSTEP/threads-sema.pdf,OSTEP,pdf,Free online textbook (Arpaci-Dusseau),1,0,/~remzi/OSTEP/,semaphore;producer-consumer;readers-writers;dining-philosophers
+https://pages.cs.wisc.edu/~remzi/OSTEP/threads-bugs.pdf,OSTEP,pdf,Free online textbook (Arpaci-Dusseau),1,0,/~remzi/OSTEP/,deadlock;atomicity-violation;order-violation
+https://greenteapress.com/semaphores/LittleBookOfSemaphores.pdf,The Little Book of Semaphores,pdf,CC BY-NC-SA 4.0 (Allen B. Downey),1,0,/semaphores/,semaphore;classical-problems;sleeping-barber;dining-philosophers;readers-writers
+https://en.wikipedia.org/wiki/Peterson%27s_algorithm,Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,peterson;mutual-exclusion
+https://en.wikipedia.org/wiki/Dekker%27s_algorithm,Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,dekker;mutual-exclusion
+https://en.wikipedia.org/wiki/Semaphore_(programming),Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,semaphore
+https://en.wikipedia.org/wiki/Monitor_(synchronization),Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,monitor;condition-variable
+https://en.wikipedia.org/wiki/Mutual_exclusion,Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,mutual-exclusion
+https://en.wikipedia.org/wiki/Critical_section,Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,critical-section
+https://en.wikipedia.org/wiki/Race_condition,Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,race-condition
+https://en.wikipedia.org/wiki/Deadlock_(computer_science),Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,deadlock
+https://en.wikipedia.org/wiki/Producer%E2%80%93consumer_problem,Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,producer-consumer;bounded-buffer
+https://en.wikipedia.org/wiki/Readers%E2%80%93writers_problem,Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,readers-writers
+https://en.wikipedia.org/wiki/Dining_philosophers_problem,Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,dining-philosophers
+https://en.wikipedia.org/wiki/Sleeping_barber_problem,Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,sleeping-barber
+https://en.wikipedia.org/wiki/Priority_inversion,Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,priority-inversion
+https://en.wikipedia.org/wiki/Spinlock,Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,spinlock
+https://en.wikipedia.org/wiki/Test-and-set,Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,test-and-set
+https://en.wikipedia.org/wiki/Compare-and-swap,Wikipedia,html,CC BY-SA 4.0,2,0,/wiki/,compare-and-swap
