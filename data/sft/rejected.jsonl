@@ -4,7 +4,7 @@
 {"id": "dfa902a23c1d", "category": "trace", "variant": "standard", "problems": ["trace without an interleaving table"]}
 {"id": "49a7ec9264cc", "category": "trace", "variant": "distractor", "problems": ["trace without an interleaving table"]}
 {"id": "9958bccb1f02", "category": "code_write", "variant": "standard", "problems": ["program not clean: Compilation failed: line 52: expected ‘)’ before ‘;’ token; line 53: expected ‘;’ before ‘}’ token"]}
-{"id": "9e2237c38694", "category": "code_write", "variant": "standard", "problems": ["program not clean: killed by the sandbox's memory or process limit"]}
+{"id": "9e2237c38694", "category": "code_write", "variant": "standard", "problems": ["program not clean: CPU limit hit — possible infinite loop or busy waiting"]}
 {"id": "ext-d7277bd6d089", "category": "concept", "variant": "external_no_context", "problems": ["concept answer too terse"]}
 {"id": "ext-62ab97974286", "category": "concept", "variant": "external_no_context", "problems": ["concept answer too terse"]}
 {"id": "ext-16d9ac4eeec6", "category": "concept", "variant": "external_no_context", "problems": ["concept answer too terse"]}

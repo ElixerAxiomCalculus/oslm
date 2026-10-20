@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -99,6 +100,10 @@ STANDALONE_START = re.compile(
     r"^\s*(what|why|how|when|where|who|define|explain|compare|describe|write|implement|show|trace|find|review)\b",
     re.I,
 )
+CHECK_QUESTION = re.compile(
+    r"\b(check (?:your )?understanding|your turn|answer (?:this|the question)|what do you think)\b",
+    re.I,
+)
 
 
 @dataclass
@@ -145,15 +150,30 @@ def _last_assistant_asked(history: Sequence[dict[str, str]]) -> bool:
     return False
 
 
+def _last_assistant_gave_check(history: Sequence[dict[str, str]]) -> bool:
+    for turn in reversed(history):
+        if turn.get("role") == "assistant":
+            content = html.unescape(turn.get("content", ""))
+            return "?" in content[-700:] and bool(CHECK_QUESTION.search(content[-700:]))
+    return False
+
+
 def is_check_answer(message: str, history: Sequence[dict[str, str]]) -> bool:
-    """Whether a short turn is answering the tutor's latest understanding check."""
-    words = _word_count(message)
+    """Whether a turn is answering the tutor's latest understanding check.
+
+    Explicit check questions may receive a complete sentence, not only a terse noun phrase.
+    HTML entities can appear when text is pasted from the rendered notebook, so classify the
+    decoded text while preserving the original message for display.
+    """
+    text = html.unescape(message).strip()
+    words = _word_count(text)
+    explicit_check = _last_assistant_gave_check(history)
     return bool(
         history
-        and 0 < words <= 14
+        and 0 < words <= (80 if explicit_check else 14)
         and _last_assistant_asked(history)
-        and not contains_code(message)
-        and (SHORT_REPLY.search(message) or not STANDALONE_START.search(message))
+        and not contains_code(text)
+        and (SHORT_REPLY.search(text) or (explicit_check and not STANDALONE_START.search(text)))
     )
 
 
@@ -187,7 +207,7 @@ def route(
     history: Sequence[dict[str, str]] = (),
 ) -> Route:
     """Rule-based classification; `ambiguous=True` invites the cheap LLM fallback."""
-    text = message.strip()
+    text = html.unescape(message).strip()
     if not re.search(r"[^\W_]", text, re.UNICODE):
         return Route("empty", needs_retrieval=False, reason="no letters or digits")
 

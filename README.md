@@ -102,14 +102,15 @@ gitignored and never redistributed; re-run `oslm ingest` and `oslm index` after 
 
 ### How the fine-tuning data was built
 
-The training set came from two externally written Q&A files (`process_synchronization_training*.csv`, 560 rows) plus
+The training set came from two externally written Q&A files (`process_synchronization_training*.csv`, 562 rows) plus
 25 Gemini-generated pilot answers. `oslm sft --step import` gives every row the same treatment the live pipeline
 applies: the router's mode, the course-note chunks the retriever would fetch, and `[n]` citations added only where an
 answer sentence closely matches a chunk (explanations with no supported citation become "no notes" examples so the
 model never learns to ignore attached notes). Verification then compiles and runs every C program under TSan and
-Helgrind, rejects answers that break the format rules, removes near-duplicates (152 templated rows) and anything close
-to the evaluation questions. Result: 381 examples (343 train / 38 validation), including explicit short-answer
-follow-ups so the tutor learns to grade replies such as "I think the gate" instead of replaying the previous lesson.
+Helgrind, rejects answers that break the format rules, removes near-duplicates and anything close to the evaluation
+questions. The deployed adapter was trained on 381 examples (343 train / 38 validation). After the final reported
+Peterson regression was added, the prepared next-training snapshot contains 382 examples (345 train / 37 validation),
+including both terse and full-sentence answer checks so the tutor grades replies instead of replaying the lesson.
 
 ### Training notes (Windows, 8 GB GPU)
 
@@ -141,7 +142,9 @@ These are the original 2026-10-11 baseline results and remain recorded for repro
 2026-10-19/20 repair: the importer removes boilerplate, verification rejects incomplete answers, explicit
 short-answer follow-ups were added, and the fine-tune was rebuilt. Serving now uses history-aware routing,
 safe multilingual/long-prompt fallbacks, and buffered compile/TSan/Helgrind checks with up to three checker-guided
-repair attempts. On 2026-10-20, a fresh forced run of the 38-probe fine-tuned suite scored **92% (35/38)**, up from
+repair attempts. Broad Peterson explanations and the standard producer-consumer program also have audited,
+checker-backed fallbacks; failed code is withheld after the bounded repair loop. On 2026-10-20, a fresh forced run
+of the 38-probe fine-tuned suite scored **92% (35/38)**, up from
 the 61% baseline. Every category passed at 100% except typo robustness (67%) and complex C generation (0%): the two
 classical synchronization programs that remained unsafe after the bounded repair loop were explicitly flagged
 instead of being presented as verified. See

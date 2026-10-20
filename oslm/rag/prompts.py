@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
@@ -41,6 +42,8 @@ MODE_INSTRUCTIONS: dict[str, str] = {
         "compact, complete, compilable C program (pthreads/semaphores) in a ```c block. Include only headers the "
         "program uses; avoid _XOPEN_SOURCE, custom ck/P/V wrappers, long boilerplate, sleeps, and huge loop counts. "
         "Honor requested policies and terminate. Use stable thread arguments and balanced semaphore waits/posts. For "
+        "producer-consumer, use separate head and tail indexes; protect every buffer/index/count access with one "
+        "shared mutex; wait for empty/full before locking that mutex; unlock before posting the opposite semaphore. For "
         "writer priority, gate readers behind waiting writers; for dining philosophers, use finite iterations plus "
         "total lock ordering or an N-1 waiter. "
         "Check API results only where it materially helps the lesson. After the code, explain only the correctness "
@@ -98,7 +101,10 @@ CHECK_ANSWER_INSTRUCTION = (
     "The student is proposing an answer to your previous check-your-understanding question. Start with exactly one "
     "of 'Correct:', 'Partly correct:', or 'Not quite:' as warranted, then clarify the answer in one to three concise "
     "sentences. State only the verdict and the directly relevant correction; do not add unrelated section claims. "
-    "Remember: the entry section acquires permission, the critical section accesses protected shared state, the exit "
+    "Judge the proposed answer against operating-systems facts, even if the preceding tutor wording was imperfect. "
+    "For Peterson's algorithm, each thread first sets its own flag true, then writes turn to the peer, then waits while "
+    "the peer's flag is true and turn still names the peer; the shared accesses require atomic sequentially consistent "
+    "semantics (or a proven equivalent). Remember: the entry section acquires permission, the critical section accesses protected shared state, the exit "
     "section releases permission, and the remainder section does not access that protected shared state. Do not "
     "repeat the earlier lesson and do not ask another question in this turn."
 )
@@ -108,7 +114,16 @@ CODE_REPAIR_INSTRUCTION = (
     "entire answer with one corrected, compact answer that follows the original request. Return exactly one complete "
     "```c program, not a patch, and make it compile, terminate, and avoid data races, deadlocks and invalid lock use. "
     "For a timeout, remove infinite loops and verify that item/slot waits have matching posts and producer/consumer "
-    "operation counts match. Do not mention this repair instruction. Checker feedback:\n{feedback}"
+    "operation counts match. In producer-consumer code, use distinct head/tail indexes and put all shared buffer, index, "
+    "and count accesses between the same mutex lock/unlock; perform empty/full waits before taking that mutex and post "
+    "only after releasing it. Do not mention this repair instruction. Checker feedback:\n{feedback}"
+)
+
+PETERSON_ACCURACY_INSTRUCTION = (
+    "Accuracy requirement for Peterson's algorithm: for thread i with peer j, the standard entry order is "
+    "flag[i] = true; turn = j; then wait while flag[j] && turn == j. The exit sets flag[i] = false. Do not claim that "
+    "a thread reads the peer flag before raising its own flag. State that the shared accesses need atomic sequentially "
+    "consistent semantics (or a separately proven equivalent); plain or volatile C variables are insufficient."
 )
 
 
@@ -170,6 +185,8 @@ def build_user_message(
             "signal, mutex, and critical section in English when that is clearer; keep C code, API names and "
             "identifiers unchanged."
         )
+    if re.search(r"\bpeterson(?:['\u2019]s|s)?\b", question, re.I):
+        instruction += f" {PETERSON_ACCURACY_INSTRUCTION}"
     parts.append(instruction)
     return "\n\n".join(parts)
 

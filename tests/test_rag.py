@@ -87,6 +87,20 @@ class TestRouter:
         assert is_check_answer(msg, history)
         assert not route(msg).followup
 
+    def test_complete_answer_with_html_entity_is_answer_to_explicit_check(self) -> None:
+        history = [
+            {
+                "role": "assistant",
+                "content": "Check your understanding: What must be true about Peterson's shared accesses?",
+            }
+        ]
+        answer = (
+            "&#x20;Peterson's protocol requires atomic reads and writes with sequential consistency so that the "
+            "intention flags and turn are observed in the required order."
+        )
+        assert is_check_answer(answer, history)
+        assert route(answer, history=history).followup
+
     def test_new_standalone_question_after_tutor_question_is_not_forced_to_followup(self) -> None:
         history = [{"role": "assistant", "content": "What protects the counter?"}]
         assert not route("What is paging?", history=history).followup
@@ -114,9 +128,15 @@ class TestCitations:
         assert clean_citations("A [1] B [5] C [2, 7]", 2) == "A [1] B C [2]"
 
     def test_code_indexing_untouched(self) -> None:
-        text = "See [1].\n```c\nbuf[3] = x;\n```\nAnd [9]."
-        assert clean_outside_code(text, 1) == "See [1].\n```c\nbuf[3] = x;\n```\nAnd."
+        text = "See [1] and `flag[0]`.\n```c\nbuf[3] = x;\n```\nAnd [9]."
+        assert clean_outside_code(text, 1) == "See [1] and `flag[0]`.\n```c\nbuf[3] = x;\n```\nAnd."
         assert cited_numbers(text, 1) == [1]
+
+    def test_stream_preserves_inline_code_index_across_deltas(self) -> None:
+        stream = CitationStream(0)
+        out = "".join(stream.feed(d) for d in ["Use `flag[", "0]` before bad [", "7]."]) + stream.flush()
+        assert out == "Use `flag[0]` before bad."
+        assert stream.counts() == (0, 1)
 
     def test_stream_never_splits_citation(self) -> None:
         deltas = [
@@ -151,12 +171,20 @@ class TestPrompts:
         assert "Start with exactly one" in msg
         assert "do not ask another question" in msg
         assert "remainder section does not access" in msg
+        assert "first sets its own flag true" in msg
 
     def test_code_prompt_requires_compact_complete_program_even_without_exact_notes(self) -> None:
         msg = build_user_message("Write a bounded buffer", "code_write", [])
         assert "even if the notes" in msg and "avoid _XOPEN_SOURCE" in msg
         assert "at most five concise bullets" in msg and "claims contradicted by the code" in msg
+        assert "separate head and tail indexes" in msg
         assert "stable thread arguments" in msg and "N-1 waiter" in msg
+
+    def test_peterson_prompt_states_the_standard_entry_order(self) -> None:
+        msg = build_user_message("Explain Peterson's algorithm", "concept", [])
+        assert "flag[i] = true; turn = j" in msg
+        assert "Do not claim that a thread reads the peer flag before raising its own flag" in msg
+        assert "flag[i] = true" in build_user_message("Explain Petersons algo", "concept", [])
 
     def test_concept_prompt_does_not_invite_unrequested_code(self) -> None:
         msg = build_user_message("What is a semaphore?", "concept", [])
@@ -379,12 +407,11 @@ class TestPipeline:
         assert checker.codes and info["verification"][0]["status"] == "clean"
 
     @respx.mock
-    async def test_fine_tuned_followup_uses_base_model_for_rewrite(self, client: OllamaClient) -> None:
+    async def test_fine_tuned_answer_check_preserves_answer_and_uses_base_model(self, client: OllamaClient) -> None:
         r = respx.post(f"{OLLAMA}/api/chat").mock(
-            side_effect=[
-                httpx.Response(200, content=ollama_stream(["What is the entry section of a protected counter?"])),
-                httpx.Response(200, content=ollama_stream(["Yes. The lock call is the entry section."])),
-            ]
+            return_value=httpx.Response(
+                200, content=ollama_stream(["Correct: The lock call is the entry section."])
+            )
         )
         history = [
             {"role": "user", "content": "Explain a protected counter"},
@@ -396,11 +423,58 @@ class TestPipeline:
         )
         payloads = chat_payloads(r)
         assert info["meta"]["followup"] is True
-        assert payloads[0]["model"] == "qwen3:4b-instruct-2507-q4_K_M"
-        assert payloads[1]["model"] == "oslm-ft"
-        assert payloads[1]["options"]["temperature"] == 0.0
-        prompt = payloads[1]["messages"][-1]["content"]
+        assert info["meta"]["model_fallback"] == "answer_check_base"
+        assert len(payloads) == 1 and payloads[0]["model"] == "qwen3:4b-instruct-2507-q4_K_M"
+        assert payloads[0]["options"]["temperature"] == 0.0
+        prompt = payloads[0]["messages"][-1]["content"]
+        assert "I think the gate" in prompt
         assert "Start with exactly one" in prompt and "do not ask another question" in prompt
+
+    async def test_complete_peterson_memory_answer_gets_canonical_correct_verdict(self, client: OllamaClient) -> None:
+        history = [
+            {"role": "user", "content": "Explain Peterson's algorithm"},
+            {
+                "role": "assistant",
+                "content": "Check your understanding: What must be true about Peterson's shared reads and writes?",
+            },
+        ]
+        answer = (
+            "&#x20;Peterson's protocol requires atomic reads and writes with sequential consistency so that flag and "
+            "turn are observed in the required order."
+        )
+        text, info = await answer_text(
+            Pipeline(client=client, retriever=FakeRetriever()),
+            ChatRequest(answer, setup="ft", history=history),
+        )
+        assert text.startswith("Correct:") and "Check your understanding" not in text
+        assert info["meta"]["model_fallback"] == "answer_check_canonical"
+        assert info["done"]["timings"]["tokens"] == 0
+
+    @respx.mock
+    async def test_specialized_wrong_peterson_generation_is_replaced_with_canonical_answer(
+        self, client: OllamaClient
+    ) -> None:
+        wrong = "Thread A reads flag[B], then writes its own flag. Peterson assumes flags are read before writing."
+        r = respx.post(f"{OLLAMA}/api/chat").mock(
+            return_value=httpx.Response(200, content=ollama_stream([wrong]))
+        )
+        text, info = await answer_text(
+            Pipeline(client=client, retriever=FakeRetriever()),
+            ChatRequest("Does Peterson read the peer flag before raising its own flag, and why?", setup="ft"),
+        )
+        assert "Set `flag[i] = true`" in text and "Set `turn = j`" in text
+        assert "reads flag[B], then writes" not in text
+        assert info["meta"]["model_fallback"] == "algorithm_accuracy_base"
+        assert chat_payloads(r)[0]["model"] == "qwen3:4b-instruct-2507-q4_K_M"
+
+    async def test_apostrophe_free_peterson_explanation_uses_canonical_answer(self, client: OllamaClient) -> None:
+        text, info = await answer_text(
+            Pipeline(client=client, retriever=FakeRetriever()),
+            ChatRequest("Explain Petersons algo", setup="ft"),
+        )
+        assert "Set `flag[i] = true`" in text and "Wait while `flag[j] && turn == j`" in text
+        assert info["meta"]["model_fallback"] == "peterson_canonical"
+        assert info["done"]["timings"]["tokens"] == 0
 
     @respx.mock
     async def test_code_answer_is_repaired_once_after_checker_failure(self, client: OllamaClient) -> None:
@@ -420,6 +494,34 @@ class TestPipeline:
         assert info["done"]["repair_attempts"] == 1
         assert info["verification"][0]["status"] == "clean"
         assert "Checker feedback" in chat_payloads(r)[1]["messages"][-1]["content"]
+
+    async def test_generic_producer_consumer_uses_verified_canonical_answer(self, client: OllamaClient) -> None:
+        checker = FakeChecker(["clean"])
+        text, info = await answer_text(
+            Pipeline(client=client, retriever=FakeRetriever(), checker=checker),
+            ChatRequest("Producer-consumer with semaphores in C", setup="ft"),
+        )
+        assert "static int head" in text and "static int tail" in text
+        assert "producer_ids" in text and "malloc" not in text and len(checker.codes) == 1
+        assert info["done"]["code_fallback"] == "producer_consumer"
+        assert info["done"]["code_withheld"] is False
+        assert info["verification"][-1]["status"] == "clean"
+        assert info["done"]["timings"]["tokens"] == 0
+
+    @respx.mock
+    async def test_unrepaired_unsafe_code_is_withheld(self, client: OllamaClient) -> None:
+        broken = "```c\nint main(void){ BROKEN }\n```"
+        respx.post(f"{OLLAMA}/api/chat").mock(
+            side_effect=[httpx.Response(200, content=ollama_stream([broken])) for _ in range(4)]
+        )
+        checker = FakeChecker(["compile_error"] * 4)
+        text, info = await answer_text(
+            Pipeline(client=client, retriever=FakeRetriever(), checker=checker),
+            ChatRequest("Write a C mutex example", setup="ft"),
+        )
+        assert "```c" not in text and "withheld the unsafe C draft" in text
+        assert info["done"]["code_withheld"] is True
+        assert info["done"]["repair_attempts"] == 3
 
     @respx.mock
     async def test_code_answer_is_sanitized_before_checker_and_display(self, client: OllamaClient) -> None:

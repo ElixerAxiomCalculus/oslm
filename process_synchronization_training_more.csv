@@ -7700,3 +7700,12 @@ followup,"Earlier - Student: The entry section runs before the critical section 
 Now: I think the gate","Exactly. The lock acquisition is the gate in the entry section: it waits until this thread has permission to enter. The shared update happens after the gate, inside the critical section, and unlock releases the gate in the exit section.",
 followup,"Earlier - Student: Mutual exclusion means at most one thread executes the protected critical section at a time. Why does that prevent a lost update? | Tutor: Consider the read-modify-write steps of count++.
 Now: because only one enters?","Yes. With only one thread inside, its read, increment, and write finish before another thread can read the counter. That makes each update visible as a complete operation instead of letting two threads overwrite the same old value.",
+concept,Explain me what is Peterson's algorithm,"Peterson's algorithm is a software mutual-exclusion protocol for exactly two threads.
+
+For thread i with peer j, the entry section sets flag[i] = true, writes turn = j, and then waits while flag[j] && turn == j. The critical section follows, and the exit section clears flag[i].
+
+The protocol provides mutual exclusion, progress, and bounded waiting under atomic sequentially consistent accesses. Plain or volatile C variables are insufficient; a portable C implementation should use C11 atomics with a proven memory order. It also busy-waits and does not generalize directly beyond two threads.
+
+Check your understanding: If flag[j] is false, can turn == j alone stop thread i?",
+followup,"Earlier - Student: Explain Peterson's algorithm. | Tutor: Each thread sets its own flag true, writes turn to the peer, and waits while the peer is interested and turn still names the peer. The shared accesses must be atomic and sequentially consistent. Check your understanding: What must be true about the shared reads and writes?
+Now: &#x20;Peterson's protocol requires atomic reads and writes with sequential consistency so the intention flags and turn are observed in the required order.","Correct: Peterson's shared flag and turn accesses must be atomic and obey sequential consistency, or another memory-order scheme with an equivalent proof. Plain or volatile C variables do not provide those guarantees.",
