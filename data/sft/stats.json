@@ -1,20 +1,20 @@
 {
-  "verified_ok": 544,
-  "kept": 385,
-  "train": 347,
+  "verified_ok": 535,
+  "kept": 381,
+  "train": 343,
   "val": 38,
   "dropped": {
-    "context chunk trimmed": 40,
+    "context chunk trimmed": 48,
     "too long": 3,
-    "near duplicate": 152,
+    "near duplicate": 147,
     "eval leakage": 4
   },
   "by_category": {
-    "concept": 122,
+    "concept": 113,
     "code_write": 55,
-    "multiturn": 14,
+    "multiturn": 20,
     "trace": 53,
-    "bug_find": 84,
+    "bug_find": 83,
     "not_covered": 29,
     "meta": 28
   },
@@ -23,8 +23,8 @@
     "no_context": 2,
     "standard": 6,
     "code_write": 1,
-    "external": 152,
-    "external_no_context": 221
+    "external": 151,
+    "external_no_context": 218
   },
-  "tokens_p95": 1946
+  "tokens_p95": 1966
 }

@@ -7,11 +7,20 @@ import subprocess
 from typing import Any
 
 from oslm.config import load_config
-from oslm.sft.store import append_jsonl, read_jsonl
+from oslm.sft.store import append_jsonl, read_jsonl, write_jsonl
 
 log = logging.getLogger(__name__)
 
 SETUPS = ("base", "base_rag", "ft", "ft_rag")
+
+
+def invalidate_judgements(path: Any, setups: list[str], item_ids: set[str]) -> int:
+    """Drop cached grades whose answers are about to be regenerated."""
+    rows = read_jsonl(path)
+    kept = [r for r in rows if not (r.get("setup") in setups and r.get("id") in item_ids)]
+    if len(kept) != len(rows):
+        write_jsonl(path, kept)
+    return len(rows) - len(kept)
 
 
 def load_suite(suite: str) -> list[dict[str, Any]]:
@@ -102,6 +111,12 @@ def run_eval(setups: list[str], suite: str = "all", force: bool = False, limit: 
     items = load_suite(suite)
     if limit:
         items = items[:limit]
+    if force:
+        removed = invalidate_judgements(
+            results / "judgements.jsonl", setups, {str(item["id"]) for item in items}
+        )
+        if removed:
+            log.info("invalidated %d cached judgements", removed)
     ran = []
     for setup in setups:
         tag = cfg.ollama["ft_tag"] if setup.startswith("ft") else cfg.ollama["base_tag"]

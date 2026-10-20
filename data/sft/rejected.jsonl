@@ -4,38 +4,53 @@
 {"id": "dfa902a23c1d", "category": "trace", "variant": "standard", "problems": ["trace without an interleaving table"]}
 {"id": "49a7ec9264cc", "category": "trace", "variant": "distractor", "problems": ["trace without an interleaving table"]}
 {"id": "9958bccb1f02", "category": "code_write", "variant": "standard", "problems": ["program not clean: Compilation failed: line 52: expected ‘)’ before ‘;’ token; line 53: expected ‘;’ before ‘}’ token"]}
-{"id": "9e2237c38694", "category": "code_write", "variant": "standard", "problems": ["program not clean: CPU limit hit — possible infinite loop or busy waiting"]}
-{"id": "ext-6a0d87930fc2", "category": "concept", "variant": "external_no_context", "problems": ["code answer without a complete C program"]}
-{"id": "ext-52b41aa84b5a", "category": "concept", "variant": "external", "problems": ["trace without an interleaving table"]}
-{"id": "ext-ff59b60ad895", "category": "concept", "variant": "external_no_context", "problems": ["trace without an interleaving table"]}
-{"id": "ext-98fe8cdb7d68", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 18)"]}
-{"id": "ext-d7fb6c08f58e", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 24)"]}
-{"id": "ext-354147ae72d5", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 16, 17, 18)"]}
-{"id": "ext-dfd00ec21ab1", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 18)"]}
-{"id": "ext-e5db7545486c", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 24)"]}
-{"id": "ext-72516bd69ee9", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 16, 17, 18)"]}
-{"id": "ext-688366cb5570", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 18)"]}
-{"id": "ext-96b6065c0a43", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 24)"]}
-{"id": "ext-522abecf61bf", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 16, 17, 18)"]}
-{"id": "ext-bb0b7f555689", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 18)"]}
-{"id": "ext-aba7980d75cb", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 24)"]}
-{"id": "ext-da69e51f9588", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 16, 17, 18)"]}
-{"id": "ext-3ef15d2d5946", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 18)"]}
-{"id": "ext-34636ca34747", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 24)"]}
-{"id": "ext-767bac057d64", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 16, 17, 18)"]}
-{"id": "ext-e7704ccd463d", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
-{"id": "ext-576007068d44", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
-{"id": "ext-1ed828a7c517", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
-{"id": "ext-f49de0fe3fc7", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
-{"id": "ext-7a3b562685e5", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
-{"id": "ext-779ea6a09b57", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
-{"id": "ext-85bd58b29873", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
-{"id": "ext-8835867c0dcf", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
-{"id": "ext-ef978f17ef89", "category": "not_covered", "variant": "external", "problems": ["trace without an interleaving table"]}
-{"id": "ext-fe5aa9022ef2", "category": "bug_find", "variant": "external", "problems": ["citation outside 1..3"]}
-{"id": "ext-d398b15a24b8", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 24, 25, 26, 27)"]}
-{"id": "ext-45300f1c7433", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 22, 25)"]}
-{"id": "ext-e137928ccf12", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 24, 26)"]}
-{"id": "ext-1d0bfb708563", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 26, 33)"]}
-{"id": "ext-74401b108c01", "category": "multiturn", "variant": "external_no_context", "problems": ["code answer without a complete C program"]}
-{"id": "ext-33dd8a4ccdf2", "category": "multiturn", "variant": "external_no_context", "problems": ["code answer without a complete C program"]}
+{"id": "9e2237c38694", "category": "code_write", "variant": "standard", "problems": ["program not clean: killed by the sandbox's memory or process limit"]}
+{"id": "ext-d7277bd6d089", "category": "concept", "variant": "external_no_context", "problems": ["concept answer too terse"]}
+{"id": "ext-62ab97974286", "category": "concept", "variant": "external_no_context", "problems": ["concept answer too terse"]}
+{"id": "ext-16d9ac4eeec6", "category": "concept", "variant": "external_no_context", "problems": ["concept answer too terse"]}
+{"id": "ext-8e2c5834abfa", "category": "concept", "variant": "external_no_context", "problems": ["code answer without a complete C program"]}
+{"id": "ext-8c13e22111db", "category": "concept", "variant": "external_no_context", "problems": ["concept answer too terse"]}
+{"id": "ext-4f841677757b", "category": "concept", "variant": "external_no_context", "problems": ["concept answer too terse"]}
+{"id": "ext-4183a491a4fd", "category": "concept", "variant": "external_no_context", "problems": ["concept answer too terse"]}
+{"id": "ext-9807ee6b26b8", "category": "concept", "variant": "external_no_context", "problems": ["concept answer too terse"]}
+{"id": "ext-27f77be8c947", "category": "concept", "variant": "external_no_context", "problems": ["concept answer too terse"]}
+{"id": "ext-e52dfc650350", "category": "concept", "variant": "external_no_context", "problems": ["concept answer too terse"]}
+{"id": "ext-20315336107a", "category": "concept", "variant": "external", "problems": ["trace without an interleaving table"]}
+{"id": "ext-b64372f74410", "category": "concept", "variant": "external_no_context", "problems": ["concept answer too terse"]}
+{"id": "ext-6c5c6a1d6369", "category": "concept", "variant": "external_no_context", "problems": ["trace without an interleaving table"]}
+{"id": "ext-9af80292b188", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 14)"]}
+{"id": "ext-7b03081724be", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 20)"]}
+{"id": "ext-9e2bf3d9b340", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 12, 13, 14)"]}
+{"id": "ext-363dc7df517e", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 14)"]}
+{"id": "ext-77deda01483b", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 20)"]}
+{"id": "ext-34f9f79c113e", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 12, 13, 14)"]}
+{"id": "ext-c37fa25e86a9", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 14)"]}
+{"id": "ext-df1c2ae25998", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 20)"]}
+{"id": "ext-8c1ca85e4b6e", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 12, 13, 14)"]}
+{"id": "ext-ea5b614cabad", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 14)"]}
+{"id": "ext-aaa34a3e2927", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 20)"]}
+{"id": "ext-e181445f3d74", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 12, 13, 14)"]}
+{"id": "ext-08d8b902aac6", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 14)"]}
+{"id": "ext-cb69e9653f21", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (line 20)"]}
+{"id": "ext-89399f42f907", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 12, 13, 14)"]}
+{"id": "ext-4c1f78a7c956", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
+{"id": "ext-9fb7b36a2c41", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
+{"id": "ext-c3d5aa05ff6f", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
+{"id": "ext-143633db5990", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
+{"id": "ext-6685c9bda8f5", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
+{"id": "ext-8e1968036203", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
+{"id": "ext-76f225ba864c", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
+{"id": "ext-a5a7f94f3da0", "category": "trace", "variant": "external_no_context", "problems": ["citation outside 1..0", "citations in a no-notes answer"]}
+{"id": "ext-cd1d074983cb", "category": "bug_find", "variant": "external", "problems": ["bug review without an interleaving table"]}
+{"id": "ext-dcea392aefb1", "category": "bug_find", "variant": "external", "problems": ["bug review without an interleaving table"]}
+{"id": "ext-91371ab7be07", "category": "bug_find", "variant": "external", "problems": ["bug review without an interleaving table"]}
+{"id": "ext-b76f2696febd", "category": "bug_find", "variant": "external", "problems": ["bug review without an interleaving table"]}
+{"id": "ext-cefc3b9e87fe", "category": "bug_find", "variant": "external", "problems": ["bug review without an interleaving table"]}
+{"id": "ext-8a6685390244", "category": "not_covered", "variant": "external", "problems": ["trace without an interleaving table"]}
+{"id": "ext-7c0c72608ef2", "category": "bug_find", "variant": "external", "problems": ["citation outside 1..3"]}
+{"id": "ext-549311badf93", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 9, 10, 11, 12)"]}
+{"id": "ext-d4c5f2b6b7ab", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 5, 8)"]}
+{"id": "ext-00b3437de511", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 8, 10)"]}
+{"id": "ext-68f27ae03741", "category": "code_write", "variant": "external_no_context", "problems": ["program not clean: data race (lines 11, 18)"]}
+{"id": "ext-099bd5b57ed5", "category": "multiturn", "variant": "external_no_context", "problems": ["code answer without a complete C program"]}
+{"id": "ext-05270f1faad1", "category": "multiturn", "variant": "external_no_context", "problems": ["code answer without a complete C program"]}

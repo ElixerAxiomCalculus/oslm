@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -16,6 +17,16 @@ class OllamaError(RuntimeError):
 def model_for_setup(setup: str) -> str:
     tags = load_config().ollama
     return tags["ft_tag"] if setup.startswith("ft") else tags["base_tag"]
+
+
+def auxiliary_model() -> str:
+    """Use the instruction-following base model for routing helpers.
+
+    The teaching adapter is trained to answer lessons, not to emit classifier labels or
+    standalone rewrites. Using it for control-plane calls can turn a label request into a
+    canned lesson and silently poison routing.
+    """
+    return load_config().ollama["base_tag"]
 
 
 def decoding_options(mode: str, overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -98,6 +109,31 @@ CLASSIFY_SYSTEM = (
     "other - anything else"
 )
 
+NORMALIZE_SYSTEM = (
+    "Extract the student's actual process-synchronization question. Remove rambling background and translate it "
+    "to concise English when necessary, while preserving every requested sub-question and requested action "
+    "(explain, compare, trace, review code, or write code). Output only the resulting question, on one line."
+)
+
+_STANDALONE_INTENT = re.compile(
+    r"\b(what|why|how|when|where|which|define|explain|compare|describe|write|implement|show|trace|find|review|"
+    r"can|could|does|do|is|are|should|would)\b",
+    re.I,
+)
+
+
+def response_language(message: str) -> str | None:
+    """Return the requested response language for scripts covered by the robustness probes."""
+    if re.search(r"[\u0900-\u097f]", message):
+        return "Hindi using Devanagari script"
+    if re.search(r"[\u0b80-\u0bff]", message):
+        return "Tamil using Tamil script"
+    return None
+
+
+def needs_normalization(message: str) -> bool:
+    return response_language(message) is not None or len(re.findall(r"\w+", message, re.UNICODE)) > 120
+
 
 def _history_text(history: list[dict[str, str]], max_chars: int = 1200) -> str:
     lines = []
@@ -116,7 +152,24 @@ def _aux_options(num_predict: int) -> dict[str, Any]:
 
 def _first_line(text: str) -> str:
     stripped = text.strip()
-    return stripped.strip('"').splitlines()[0].strip().strip('"') if stripped else ""
+    line = stripped.strip('"').splitlines()[0].strip().strip('"') if stripped else ""
+    return re.sub(r"^(?:standalone\s+)?question\s*:\s*", "", line, flags=re.I)
+
+
+def _valid_question(text: str) -> bool:
+    lower = text.lower()
+    return (
+        3 <= len(text) <= 800
+        and "check your understanding" not in lower
+        and "common misconception" not in lower
+        and bool(_STANDALONE_INTENT.search(text))
+    )
+
+
+def _followup_fallback(message: str, history: list[dict[str, str]]) -> str:
+    previous = next((t.get("content", "") for t in reversed(history) if t.get("role") == "user"), "")
+    previous = re.sub(r"\s+", " ", previous).strip()[:300]
+    return f"Regarding the earlier question '{previous}': {message.strip()}" if previous else message
 
 
 async def rewrite_followup(client: OllamaClient, model: str, message: str, history: list[dict[str, str]]) -> str:
@@ -124,7 +177,14 @@ async def rewrite_followup(client: OllamaClient, model: str, message: str, histo
         return message
     prompt = f"Conversation:\n{_history_text(history)}\n\nLatest message: {message}\n\nStandalone question:"
     messages = [{"role": "system", "content": REWRITE_SYSTEM}, {"role": "user", "content": prompt}]
-    return _first_line(await client.chat(model, messages, _aux_options(96))) or message
+    rewritten = _first_line(await client.chat(model, messages, _aux_options(96)))
+    return rewritten if _valid_question(rewritten) else _followup_fallback(message, history)
+
+
+async def normalize_question(client: OllamaClient, model: str, message: str) -> str:
+    messages = [{"role": "system", "content": NORMALIZE_SYSTEM}, {"role": "user", "content": message[:8000]}]
+    normalized = _first_line(await client.chat(model, messages, _aux_options(160)))
+    return normalized if _valid_question(normalized) else message
 
 
 async def search_query(client: OllamaClient, model: str, message: str) -> str:
@@ -138,4 +198,5 @@ async def classify_ambiguous(client: OllamaClient, model: str, message: str) -> 
     for label in ("sync", "os", "greeting", "other"):
         if out.startswith(label):
             return label
-    return "sync"
+    # An invalid label is not evidence that an arbitrary request is about synchronization.
+    return "other"

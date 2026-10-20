@@ -10,7 +10,7 @@ from functools import lru_cache
 from typing import Any
 
 from oslm.rag.prompts import ContextChunk, build_user_message
-from oslm.rag.router import refine_followup, route
+from oslm.rag.router import is_check_answer, refine_followup, route
 
 FIXED_MODES = {"greeting", "off_topic", "os_out_of_scope", "not_in_notes"}
 AUTHORED_FORMATS = {"trace", "code_write", "bug_find"}
@@ -28,8 +28,12 @@ def current_mode(item: dict[str, Any]) -> str:
     if stored in FIXED_MODES:
         return stored
     if item.get("history"):
-        r = route(item["question"], has_history=True)
-        mode = refine_followup(item.get("rewritten") or item["question"]) if r.mode == "concept" else r.mode
+        r = route(item["question"], history=item["history"])
+        mode = (
+            refine_followup(item.get("rewritten") or item["question"])
+            if r.mode == "concept" and not is_check_answer(item["question"], item["history"])
+            else r.mode
+        )
     else:
         r = route(item["question"])
         mode = stored if r.mode == "empty" or r.ambiguous else r.mode
@@ -52,7 +56,13 @@ def refresh_item(item: dict[str, Any]) -> dict[str, Any]:
             for c in (chunks[i] for i in ids if i in chunks)
         ]
     question = item.get("rewritten") or item["question"]
+    check_answer = bool(item.get("history")) and is_check_answer(item["question"], item["history"])
     item["user_message"] = build_user_message(
-        question, item["mode"], context, followup=bool(item.get("history")), topics=item.get("topics", ())
+        question,
+        item["mode"],
+        context,
+        followup=bool(item.get("history")),
+        topics=item.get("topics", ()),
+        check_answer=check_answer,
     )
     return item

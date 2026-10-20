@@ -6,7 +6,7 @@ then the rule, then a quick check-your-understanding question. It combines
 
 - **Retrieval-augmented generation** over vetted course material (OSTEP, *The Little Book of Semaphores*, Linux/POSIX man
   pages, Wikipedia, plus your own course files), with inline `[n]` citations;
-- a **QLoRA fine-tune of Qwen3-4B-Instruct-2507** trained on 385 checked examples in the tutor's style (every C
+- a **QLoRA fine-tune of Qwen3-4B-Instruct-2507** trained on 381 checked examples in the tutor's style (every C
   program in the data verified under ThreadSanitizer and Helgrind);
 - a **C code checker** that compiles programs and runs them under ThreadSanitizer and Helgrind inside a sandbox;
 - a **notebook-style web app** where answers are "handwritten" onto ruled paper.
@@ -28,9 +28,11 @@ flowchart TD
     RR --> PB["Mode-specific prompt (oslm/rag/prompts.py)"]
     NIN --> PB
     PB --> OL["Ollama: qwen3:4b-instruct-2507 (base) or oslm-ft (fine-tuned), Q4_K_M"]
-    OL -- tokens --> API
-    API -- "complete C programs" --> CK["WSL2 checker: gcc · TSan · Helgrind in bubblewrap"]
-    CK -- "verification event" --> UI
+    OL -- "concept tokens" --> API
+    OL -- "complete C answer" --> CK["WSL2 checker: gcc · TSan · Helgrind in bubblewrap"]
+    CK -- "failure: up to three checker-guided repairs" --> OL
+    CK -- "clean answer + verification" --> API
+    API --> UI
 ```
 
 The same `config.yaml` switch (`setup: base | base_rag | ft | ft_rag`) — or the two checkboxes on the app's sticky note —
@@ -47,7 +49,7 @@ Valgrind and bubblewrap are Linux-only). You never need to work inside WSL.
    to `PATH`). On a slow connection set `$env:UV_HTTP_TIMEOUT = "600"`.
 3. **Python environment:** `uv sync` (installs the CUDA 12.8 PyTorch wheel and everything else).
 4. **WSL2 (one time, admin):** `wsl --install -d Ubuntu`, reboot, create the Linux user. Then install the checker tools:
-   `Get-Content -Raw oslm\checker\wsl\setup.sh | wsl -d Ubuntu -u root --exec bash -s`
+   `(Get-Content oslm\checker\wsl\setup.sh) -join "`n" | wsl -d Ubuntu -u root --exec bash -s`
    (installs gcc, valgrind, bubblewrap, util-linux; safe to re-run).
 5. **Base model:** `ollama pull qwen3:4b-instruct-2507-q4_K_M`.
 6. **Secrets (optional):** copy `.env.example` to `.env` and set `GEMINI_API_KEY`. It is only used for the LLM judge
@@ -106,7 +108,8 @@ applies: the router's mode, the course-note chunks the retriever would fetch, an
 answer sentence closely matches a chunk (explanations with no supported citation become "no notes" examples so the
 model never learns to ignore attached notes). Verification then compiles and runs every C program under TSan and
 Helgrind, rejects answers that break the format rules, removes near-duplicates (152 templated rows) and anything close
-to the evaluation questions. Result: 385 examples (347 train / 38 validation).
+to the evaluation questions. Result: 381 examples (343 train / 38 validation), including explicit short-answer
+follow-ups so the tutor learns to grade replies such as "I think the gate" instead of replaying the previous lesson.
 
 ### Training notes (Windows, 8 GB GPU)
 
@@ -115,7 +118,8 @@ to the evaluation questions. Result: 385 examples (347 train / 38 validation).
   memory-light loss that projects to the 152k-token vocabulary only at answer positions.
 - Sequences are capped at 2,048 tokens and PyTorch's allocator is capped below the card's 8 GB. Going over the limit
   makes Windows page into shared memory, which was 5× slower and preceded a driver crash during development.
-- 2 epochs, 44 optimizer steps, ~35 minutes on an RTX 4070 Laptop; validation loss 2.38 → 1.88.
+- 2 epochs, 44 optimizer steps on an RTX 4070 Laptop; validation loss reached 1.652 and peak allocated VRAM was
+  7.21 GB.
 
 ## Evaluation results
 
@@ -133,10 +137,14 @@ setups, judged by a local `qwen3:8b` with a fixed rubric; code metrics come from
 | Time to first token / total (p50) | 0.40 s / 11.0 s | 0.79 s / 7.9 s | **0.38 s / 3.8 s** | 0.77 s / 4.2 s |
 | Retrieval hit@4 / MRR | — | 95% / 0.90 | — | 92% / 0.88 |
 
-**Retrieval helps; fine-tuning as trained here does not.** base_rag is the best setup. The fine-tuned model is 2–3×
-faster, never refuses code requests and declines off-scope questions reliably, but it copied two habits from its
-training data: verbose code boilerplate (a `ck()` helper it often forgets to define, which causes compile errors and
-answers truncated at 2,000 tokens) and terse explanations that the rubric scores as incomplete. See
+These are the original 2026-10-11 baseline results and remain recorded for reproducibility. They motivated the
+2026-10-19/20 repair: the importer removes boilerplate, verification rejects incomplete answers, explicit
+short-answer follow-ups were added, and the fine-tune was rebuilt. Serving now uses history-aware routing,
+safe multilingual/long-prompt fallbacks, and buffered compile/TSan/Helgrind checks with up to three checker-guided
+repair attempts. On 2026-10-20, a fresh forced run of the 38-probe fine-tuned suite scored **92% (35/38)**, up from
+the 61% baseline. Every category passed at 100% except typo robustness (67%) and complex C generation (0%): the two
+classical synchronization programs that remained unsafe after the bounded repair loop were explicitly flagged
+instead of being presented as verified. See
 [`analysis.md`](data/eval/results/analysis.md) for the full analysis and recommendations,
 [`summary.md`](data/eval/results/summary.md) for every metric, and
 [`probes_summary.md`](data/eval/results/probes_summary.md) for probe pass rates per category.

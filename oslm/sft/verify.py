@@ -61,10 +61,28 @@ def rule_problems(item: dict[str, Any]) -> list[str]:
             problems.append("missing 'Verdict: bug found'")
         if item.get("has_bug") is False and not VERDICT_OK.search(a):
             problems.append("missing 'Verdict: no synchronization bug'")
+        if item.get("has_bug"):
+            if len(re.findall(r"^\s*\|", a, re.M)) < 4:
+                problems.append("bug review without an interleaving table")
+            if "```diff" not in a:
+                problems.append("bug review without a minimal diff")
     if mode == "trace" and len(re.findall(r"^\s*\|", a, re.M)) < 4:
         problems.append("trace without an interleaving table")
-    if mode == "code_write" and not complete_c_programs(a):
-        problems.append("code answer without a complete C program")
+    if mode == "code_write":
+        if not complete_c_programs(a):
+            problems.append("code answer without a complete C program")
+        if "#define _XOPEN_SOURCE" in a or re.search(r"\bstatic\s+void\s+ck\s*\(", a):
+            problems.append("legacy code boilerplate")
+    if (
+        cat == "concept"
+        and mode == "concept"
+        and not item.get("history")
+        and variant not in ("irrelevant_context", "not_in_notes_mode")
+    ):
+        if len(a.split()) < 65:
+            problems.append("concept answer too terse")
+        if "?" not in a:
+            problems.append("concept answer has no understanding check")
     return problems
 
 

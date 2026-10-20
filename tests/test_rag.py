@@ -9,10 +9,10 @@ import respx
 
 from oslm.rag.citations import CitationStream, cited_numbers, clean_citations, clean_outside_code
 from oslm.rag.generate import OllamaClient
-from oslm.rag.pipeline import ChatRequest, Pipeline, answer_text, complete_c_programs
+from oslm.rag.pipeline import ChatRequest, Pipeline, answer_text, bug_review_hints, complete_c_programs
 from oslm.rag.prompts import SYSTEM_PROMPT, ContextChunk, build_messages, build_user_message, format_context
 from oslm.rag.retrieve import Retrieved, build_search_query
-from oslm.rag.router import route
+from oslm.rag.router import is_check_answer, route
 
 OLLAMA = "http://ollama.test"
 
@@ -77,6 +77,20 @@ class TestRouter:
         assert route(msg, has_history=True).followup
         assert not route(msg, has_history=False).followup
 
+    @pytest.mark.parametrize("msg", ["The gate where the thing checks us?", "I think the gate", "maybe the lock call"])
+    def test_short_answer_to_tutor_question_is_followup(self, msg: str) -> None:
+        history = [
+            {"role": "user", "content": "What is process synchronization?"},
+            {"role": "assistant", "content": "What is the entry section of a protected counter?"},
+        ]
+        assert route(msg, history=history).followup
+        assert is_check_answer(msg, history)
+        assert not route(msg).followup
+
+    def test_new_standalone_question_after_tutor_question_is_not_forced_to_followup(self) -> None:
+        history = [{"role": "assistant", "content": "What protects the counter?"}]
+        assert not route("What is paging?", history=history).followup
+
     def test_unknown_vocabulary_is_ambiguous(self) -> None:
         r = route("सेमाफोर क्या है?")
         assert r.ambiguous and r.mode == "concept"
@@ -84,6 +98,15 @@ class TestRouter:
     def test_bug_find_search_query_uses_prose_and_calls(self) -> None:
         q = build_search_query("Why does this crash?\n" + RACY, "bug_find")
         assert "pthread_create" in q and "counter++" not in q
+
+    def test_static_bug_review_hints_cover_common_sync_errors(self) -> None:
+        locked_return = "pthread_mutex_lock(&m); if (bad) return NULL; pthread_mutex_unlock(&m);"
+        cond_if = "if (count == 0) pthread_cond_wait(&not_empty, &m);"
+        held_wait = "sem_wait(&mutex); sem_wait(&empty);"
+        hints = bug_review_hints("\n".join((locked_return, cond_if, held_wait)))
+        assert any("leave mutex 'm' locked" in h for h in hints)
+        assert any("while loop" in h for h in hints)
+        assert any("hold-and-wait deadlock" in h for h in hints)
 
 
 class TestCitations:
@@ -96,7 +119,9 @@ class TestCitations:
         assert cited_numbers(text, 1) == [1]
 
     def test_stream_never_splits_citation(self) -> None:
-        deltas = ["Locks ", "[", "1", "] protect", " data [", "9] here", " ``", "`c\nbuf[", "5];\n``", "`"]
+        deltas = [
+            "Locks ", "[", "1", "] protect", " data [", "9] here [", "n]", " ``", "`c\nbuf[", "5];\n``", "`"
+        ]
         stream = CitationStream(2)
         emitted = [stream.feed(d) for d in deltas]
         emitted.append(stream.flush())
@@ -117,8 +142,29 @@ class TestPrompts:
 
     def test_followup_concept_uses_short_instruction(self) -> None:
         msg = build_user_message("Why must the check be in a loop?", "concept", [], followup=True)
-        assert "continues the previous turn" in msg and "Answer as a teacher" not in msg
-        assert "Answer as a teacher" in build_user_message("What is a semaphore?", "concept", [])
+        assert "continues the previous turn" in msg and "Answer the student's actual request" not in msg
+        assert "do not ask another check question" in msg and "relevant shared state" in msg
+        assert "Answer the student's actual request" in build_user_message("What is a semaphore?", "concept", [])
+
+    def test_check_answer_requires_verdict_without_another_question(self) -> None:
+        msg = build_user_message("What does the gate prevent?", "concept", [], followup=True, check_answer=True)
+        assert "Start with exactly one" in msg
+        assert "do not ask another question" in msg
+        assert "remainder section does not access" in msg
+
+    def test_code_prompt_requires_compact_complete_program_even_without_exact_notes(self) -> None:
+        msg = build_user_message("Write a bounded buffer", "code_write", [])
+        assert "even if the notes" in msg and "avoid _XOPEN_SOURCE" in msg
+        assert "at most five concise bullets" in msg and "claims contradicted by the code" in msg
+        assert "stable thread arguments" in msg and "N-1 waiter" in msg
+
+    def test_concept_prompt_does_not_invite_unrequested_code(self) -> None:
+        msg = build_user_message("What is a semaphore?", "concept", [])
+        assert "Do not generate a complete C program unless" in msg
+
+    def test_language_instruction_is_explicit(self) -> None:
+        msg = build_user_message("What is a semaphore?", "concept", [], answer_language="Hindi")
+        assert "Answer in Hindi" in msg and "at most 140 words" in msg and "standard OS terms" in msg
 
     def test_not_in_notes_lists_topics(self) -> None:
         msg = build_user_message("What is paging?", "not_in_notes", [], topics=["Semaphores", "Deadlock"])
@@ -165,14 +211,18 @@ class FakeRetriever:
 
 
 class FakeChecker:
-    def __init__(self) -> None:
+    def __init__(self, statuses: list[str] | None = None) -> None:
         self.codes: list[str] = []
+        self.statuses = statuses or []
 
     async def check_many(self, codes: list[str]) -> list[Any]:
         from oslm.checker.report import CheckReport
 
         self.codes.extend(codes)
-        return [CheckReport("clean", "No problems", tsan_clean=True, helgrind_clean=True) for _ in codes]
+        status = self.statuses.pop(0) if self.statuses else "clean"
+        if status == "clean":
+            return [CheckReport("clean", "No problems", tsan_clean=True, helgrind_clean=True) for _ in codes]
+        return [CheckReport("compile_error", "missing semicolon") for _ in codes]
 
 
 def chat_payloads(route_: respx.Route) -> list[dict[str, Any]]:
@@ -228,6 +278,82 @@ class TestPipeline:
         assert chat_payloads(r)[0]["model"] == "oslm-ft"
 
     @respx.mock
+    async def test_multilingual_ft_request_falls_back_to_base_model(self, client: OllamaClient) -> None:
+        r = respx.post(f"{OLLAMA}/api/chat").mock(
+            side_effect=[
+                httpx.Response(200, content=ollama_stream(["What is a semaphore?"])),
+                httpx.Response(200, content=ollama_stream(["A semaphore is a synchronization primitive."])),
+            ]
+        )
+        text, info = await answer_text(
+            Pipeline(client=client, retriever=FakeRetriever()),
+            ChatRequest("सेमाफोर क्या है?", setup="ft"),
+        )
+        assert "क्षमा करें" in text and "English" in text and "synchronization primitive" in text
+        assert info["meta"]["model_fallback"] == "english_accuracy_fallback"
+        assert [p["model"] for p in chat_payloads(r)] == [
+            "qwen3:4b-instruct-2507-q4_K_M",
+            "qwen3:4b-instruct-2507-q4_K_M",
+        ]
+
+    @respx.mock
+    async def test_normalized_long_ft_request_falls_back_to_base_model(self, client: OllamaClient) -> None:
+        long_message = "I am revising and keep mixing up OS concepts. " * 16 + "What is mutual exclusion?"
+        r = respx.post(f"{OLLAMA}/api/chat").mock(
+            side_effect=[
+                httpx.Response(200, content=ollama_stream(["What is mutual exclusion?"])),
+                httpx.Response(200, content=ollama_stream(["Only one thread enters the critical section."])),
+            ]
+        )
+        _, info = await answer_text(
+            Pipeline(client=client, retriever=FakeRetriever()), ChatRequest(long_message, setup="ft")
+        )
+        assert info["meta"]["model_fallback"] == "normalized_prompt_base"
+        assert all(p["model"] == "qwen3:4b-instruct-2507-q4_K_M" for p in chat_payloads(r))
+
+    @respx.mock
+    async def test_long_code_review_is_not_normalized_and_uses_safety_fallback(self, client: OllamaClient) -> None:
+        question = "Is this correct?\n```c\n" + ("/* shared counter review */\n" * 130) + "int main(void){return 0;}\n```"
+        r = respx.post(f"{OLLAMA}/api/chat").mock(
+            return_value=httpx.Response(200, content=ollama_stream(["Verdict: no synchronization bug"]))
+        )
+        _, info = await answer_text(
+            Pipeline(client=client, retriever=FakeRetriever()), ChatRequest(question, setup="ft")
+        )
+        assert info["meta"]["mode"] == "bug_find" and info["meta"]["normalized"] is False
+        assert info["meta"]["model_fallback"] == "code_safety_base"
+        assert chat_payloads(r)[0]["model"] == "qwen3:4b-instruct-2507-q4_K_M"
+
+    @respx.mock
+    async def test_complete_submitted_program_checker_evidence_reaches_review_prompt(
+        self, client: OllamaClient
+    ) -> None:
+        r = respx.post(f"{OLLAMA}/api/chat").mock(
+            return_value=httpx.Response(200, content=ollama_stream(["Verdict: no synchronization bug"]))
+        )
+        checker = FakeChecker()
+        question = "Is this correct?\n```c\nint main(void){return 0;}\n```"
+        _, info = await answer_text(
+            Pipeline(client=client, retriever=FakeRetriever(), checker=checker),
+            ChatRequest(question, setup="ft"),
+        )
+        prompt = chat_payloads(r)[0]["messages"][-1]["content"]
+        assert info["meta"]["review_evidence"] and "Automated checker: clean" in prompt
+        assert checker.codes == ["int main(void){return 0;}\n"]
+
+    @respx.mock
+    async def test_concept_code_hallucination_is_not_sent_to_checker(self, client: OllamaClient) -> None:
+        respx.post(f"{OLLAMA}/api/chat").mock(
+            return_value=httpx.Response(200, content=ollama_stream(["```c\nint main(void){return 0;}\n```"]))
+        )
+        checker = FakeChecker()
+        _, info = await answer_text(
+            Pipeline(client=client, retriever=FakeRetriever(), checker=checker),
+            ChatRequest("What is a semaphore?", setup="ft"),
+        )
+        assert checker.codes == [] and info["verification"] == []
+
+    @respx.mock
     async def test_followup_is_rewritten(self, client: OllamaClient) -> None:
         r = respx.post(f"{OLLAMA}/api/chat").mock(
             side_effect=[
@@ -249,8 +375,69 @@ class TestPipeline:
         assert info["meta"]["followup"] is True
         assert info["meta"]["mode"] == "code_write"
         assert "producer-consumer" in retriever.queries[0]
-        assert chat_payloads(r)[1]["options"]["num_predict"] == 2000
+        assert chat_payloads(r)[1]["options"]["num_predict"] == 2400
         assert checker.codes and info["verification"][0]["status"] == "clean"
+
+    @respx.mock
+    async def test_fine_tuned_followup_uses_base_model_for_rewrite(self, client: OllamaClient) -> None:
+        r = respx.post(f"{OLLAMA}/api/chat").mock(
+            side_effect=[
+                httpx.Response(200, content=ollama_stream(["What is the entry section of a protected counter?"])),
+                httpx.Response(200, content=ollama_stream(["Yes. The lock call is the entry section."])),
+            ]
+        )
+        history = [
+            {"role": "user", "content": "Explain a protected counter"},
+            {"role": "assistant", "content": "What is its entry section?"},
+        ]
+        _, info = await answer_text(
+            Pipeline(client=client, retriever=FakeRetriever()),
+            ChatRequest("I think the gate", setup="ft", history=history),
+        )
+        payloads = chat_payloads(r)
+        assert info["meta"]["followup"] is True
+        assert payloads[0]["model"] == "qwen3:4b-instruct-2507-q4_K_M"
+        assert payloads[1]["model"] == "oslm-ft"
+        assert payloads[1]["options"]["temperature"] == 0.0
+        prompt = payloads[1]["messages"][-1]["content"]
+        assert "Start with exactly one" in prompt and "do not ask another question" in prompt
+
+    @respx.mock
+    async def test_code_answer_is_repaired_once_after_checker_failure(self, client: OllamaClient) -> None:
+        r = respx.post(f"{OLLAMA}/api/chat").mock(
+            side_effect=[
+                httpx.Response(200, content=ollama_stream(["```c\nint main(void){ BROKEN }\n```"])),
+                httpx.Response(200, content=ollama_stream(["```c\nint main(void){return 0;}\n```"])),
+            ]
+        )
+        checker = FakeChecker(["compile_error", "clean"])
+        text, info = await answer_text(
+            Pipeline(client=client, retriever=FakeRetriever(), checker=checker),
+            ChatRequest("Write a C program using a mutex", setup="base"),
+        )
+        assert "return 0" in text and "BROKEN" not in text
+        assert len(checker.codes) == 2
+        assert info["done"]["repair_attempts"] == 1
+        assert info["verification"][0]["status"] == "clean"
+        assert "Checker feedback" in chat_payloads(r)[1]["messages"][-1]["content"]
+
+    @respx.mock
+    async def test_code_answer_is_sanitized_before_checker_and_display(self, client: OllamaClient) -> None:
+        legacy = """```c
+#define _XOPEN_SOURCE 700
+#include <pthread.h>
+#include <semaphore.h>
+#include <stdio.h>
+int main(void) { return 0; }
+```"""
+        respx.post(f"{OLLAMA}/api/chat").mock(return_value=httpx.Response(200, content=ollama_stream([legacy])))
+        checker = FakeChecker()
+        text, _ = await answer_text(
+            Pipeline(client=client, retriever=FakeRetriever(), checker=checker),
+            ChatRequest("Write a C program using a mutex", setup="ft"),
+        )
+        assert "_XOPEN_SOURCE" not in text and "semaphore.h" not in text and "stdio.h" not in text
+        assert checker.codes and "_XOPEN_SOURCE" not in checker.codes[0]
 
     @respx.mock
     async def test_greeting_skips_retrieval(self, client: OllamaClient) -> None:
@@ -276,6 +463,8 @@ class TestPipeline:
 
 def test_stream_normalises_crlf_split_across_deltas() -> None:
     stream = CitationStream(1)
-    out = "".join(stream.feed(d) for d in ["```c\r", "\nint main(void) {\r\n", "return 0;\r\n}\r\n```"]) + stream.flush()
+    out = (
+        "".join(stream.feed(d) for d in ["```c\r", "\nint main(void) {\r\n", "return 0;\r\n}\r\n```"]) + stream.flush()
+    )
     assert "\r" not in out and out == "```c\nint main(void) {\nreturn 0;\n}\n```"
     assert len(complete_c_programs(out)) == 1

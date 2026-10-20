@@ -71,3 +71,53 @@ def test_parse_followup() -> None:
     ]
     assert msg == "what if there are 3 producers?"
     assert importer.parse_followup("just a question") is None
+
+
+def test_code_answer_cleanup_removes_memorised_scaffold() -> None:
+    answer = """Plan.\n```c
+#define _XOPEN_SOURCE 700
+#include <pthread.h>
+#include <semaphore.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+static void ck(int e) { if (e) exit(1); }
+#define SO(x) do { if ((x)==-1) exit(1); } while (0)
+#define P(s) do { if (sem_wait(&(s))==-1) exit(1); } while (0)
+#define V(s) SO(sem_post(&(s)))
+sem_t ready;
+int main(void) { ck(pthread_mutex_lock(0)); P(ready); V(ready); return 0; }
+```"""
+    cleaned = importer.clean_external_answer(answer, "code_write")
+    assert "_XOPEN_SOURCE" not in cleaned and "static void ck" not in cleaned
+    assert "#define P(" not in cleaned and "#define V(" not in cleaned and "#define SO(" not in cleaned
+    assert "assert((pthread_mutex_lock(0)) == 0)" in cleaned
+    assert "assert(sem_wait(&(ready)) == 0)" in cleaned
+    assert "assert(sem_post(&(ready)) == 0)" in cleaned
+    assert "semaphore.h" in cleaned and "stdio.h" not in cleaned
+    assert "pthread.h" in cleaned and "assert.h" in cleaned
+
+
+def test_non_code_answers_are_not_mechanically_rewritten() -> None:
+    answer = "A ck() helper can centralize error handling."
+    assert importer.clean_external_answer(answer, "concept") == answer
+
+
+def test_code_answer_cleanup_handles_pointer_pv_functions() -> None:
+    answer = """```c
+#include <semaphore.h>
+#include <assert.h>
+static void P(sem_t *s) {
+    while (sem_wait(s) == -1) {}
+}
+static void V(sem_t *s) { sem_post(s); }
+static void keep_me(void) { sem_init(&ready, 0, 0); }
+sem_t ready;
+int main(void) { keep_me(); P(&ready); V(&ready); return 0; }
+```"""
+    cleaned = importer.clean_external_answer(answer, "code_write")
+    assert "static void P" not in cleaned and "static void V" not in cleaned
+    assert "assert(sem_wait(&ready) == 0)" in cleaned
+    assert "assert(sem_post(&ready) == 0)" in cleaned
+    assert "&(&ready)" not in cleaned
+    assert "static void keep_me" in cleaned

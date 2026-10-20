@@ -36,7 +36,14 @@ def item(answer: str, **kw) -> dict:
 
 class TestRules:
     def test_good_concept_passes(self) -> None:
-        assert rule_problems(item("A lock is like a bathroom key [1]. It stops races [2]. Can you name one?")) == []
+        answer = (
+            "A lock is like a bathroom key: one holder enters while everyone else waits [1]. "
+            "Precisely, it provides mutual exclusion for a critical section that accesses shared state [1]. "
+            "For example, both the read and write parts of counter++ must remain under the same lock [2]. "
+            "A common misconception is that merely declaring a mutex protects nearby data; every participating "
+            "thread must follow the locking protocol. Which statements form the critical section in a protected increment?"
+        )
+        assert rule_problems(item(answer)) == []
 
     def test_out_of_range_citation(self) -> None:
         assert any("citation" in p for p in rule_problems(item("Locks [3] matter a great deal.")))
@@ -60,7 +67,19 @@ class TestRules:
 
     def test_bug_verdicts(self) -> None:
         bug = item(
-            "Verdict: bug found\nThe counter is unprotected.", category="bug_find", mode="bug_find", has_bug=True
+            """Verdict: bug found
+The counter is unprotected, so both threads can read the same value and lose an increment.
+| Step | Thread 1 | Thread 2 | Shared value |
+|---|---|---|---|
+| 1 | reads 0 | | 0 |
+| 2 | | reads 0 | 0 |
+```diff
+-    ++count;
++    pthread_mutex_lock(&lock); ++count; pthread_mutex_unlock(&lock);
+```""",
+            category="bug_find",
+            mode="bug_find",
+            has_bug=True,
         )
         assert rule_problems(bug) == []
         wrong = item("Verdict: no synchronization bug\nLooks fine.", category="bug_find", mode="bug_find", has_bug=True)
@@ -126,6 +145,11 @@ class TestFormat:
         keys = ["What is a race condition?", "what is a race condition", "Explain the sleeping barber problem"]
         dup, leak = near_duplicates(keys, ["Define a race condition."], 0.92)
         assert 1 in dup and 0 in leak and 2 not in leak
+
+    def test_empty_dataset_has_no_duplicates(self) -> None:
+        from oslm.sft.format import near_duplicates
+
+        assert near_duplicates([], ["What is a race condition?"], 0.92) == (set(), set())
 
 
 @pytest.mark.integration

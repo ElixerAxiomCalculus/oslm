@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
@@ -91,6 +92,13 @@ FOLLOWUP_START = re.compile(
 ANAPHORA = re.compile(
     r"\b(it|that|this|those|these|them|they|above|previous|same|the code|your answer|the example)\b", re.I
 )
+SHORT_REPLY = re.compile(
+    r"^\s*(yes|yeah|yep|no|nope|maybe|probably|i\s+(think|guess|believe)|because|the\s+|a\s+|an\s+)", re.I
+)
+STANDALONE_START = re.compile(
+    r"^\s*(what|why|how|when|where|who|define|explain|compare|describe|write|implement|show|trace|find|review)\b",
+    re.I,
+)
 
 
 @dataclass
@@ -130,18 +138,54 @@ def _word_count(text: str) -> int:
     return len(re.findall(r"\w+", text))
 
 
-def is_followup(message: str, has_history: bool) -> bool:
-    if not has_history:
+def _last_assistant_asked(history: Sequence[dict[str, str]]) -> bool:
+    for turn in reversed(history):
+        if turn.get("role") == "assistant":
+            return "?" in turn.get("content", "")[-400:]
+    return False
+
+
+def is_check_answer(message: str, history: Sequence[dict[str, str]]) -> bool:
+    """Whether a short turn is answering the tutor's latest understanding check."""
+    words = _word_count(message)
+    return bool(
+        history
+        and 0 < words <= 14
+        and _last_assistant_asked(history)
+        and not contains_code(message)
+        and (SHORT_REPLY.search(message) or not STANDALONE_START.search(message))
+    )
+
+
+def is_followup(
+    message: str,
+    has_history: bool = False,
+    history: Sequence[dict[str, str]] = (),
+) -> bool:
+    """Recognise both explicit follow-ups and short answers to the tutor's last question.
+
+    The latter matters for teaching dialogue: replies such as "I think the gate" contain no
+    conventional anaphor, but are clearly not requests for a brand-new five-part lesson.
+    """
+    if not (has_history or history):
         return False
     words = _word_count(message)
     if words == 0:
         return False
     if FOLLOWUP_START.search(message) and words <= 16:
         return True
-    return words <= 8 and bool(ANAPHORA.search(message)) and not contains_code(message)
+    if words <= 10 and bool(ANAPHORA.search(message)) and not contains_code(message):
+        return True
+    # A short noun phrase, tentative answer, or yes/no response answers the tutor's check question.
+    # Keep clearly standalone requests ("What is paging?") on the normal routing path.
+    return is_check_answer(message, history)
 
 
-def route(message: str, has_history: bool = False) -> Route:
+def route(
+    message: str,
+    has_history: bool = False,
+    history: Sequence[dict[str, str]] = (),
+) -> Route:
     """Rule-based classification; `ambiguous=True` invites the cheap LLM fallback."""
     text = message.strip()
     if not re.search(r"[^\W_]", text, re.UNICODE):
@@ -150,7 +194,7 @@ def route(message: str, has_history: bool = False) -> Route:
     if INJECTION.search(text) and not contains_code(text):
         return Route("off_topic", needs_retrieval=False, reason="prompt injection attempt")
 
-    followup = is_followup(text, has_history)
+    followup = is_followup(text, has_history, history)
     has_code = contains_code(text)
     prose = strip_code(text) if has_code else text
     sync = bool(SYNC_TERMS.search(text))

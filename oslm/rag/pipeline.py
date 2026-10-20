@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import secrets
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
@@ -13,15 +14,20 @@ from oslm.rag.citations import CitationStream, cited_numbers
 from oslm.rag.generate import (
     OllamaClient,
     OllamaError,
+    auxiliary_model,
     classify_ambiguous,
     decoding_options,
     model_for_setup,
+    needs_normalization,
+    normalize_question,
+    response_language,
     rewrite_followup,
     search_query,
 )
-from oslm.rag.prompts import DEFAULT_TOPICS, ContextChunk, build_messages
+from oslm.rag.prompts import DEFAULT_TOPICS, ContextChunk, build_code_repair_messages, build_messages
 from oslm.rag.retrieve import Retrieved, build_search_query
-from oslm.rag.router import Route, refine_followup, route
+from oslm.rag.router import Route, contains_code, is_check_answer, refine_followup, route
+from oslm.sft.importer import clean_external_answer
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +39,11 @@ EMPTY_REPLY = (
     "Looks like that message was empty. Ask me anything about process synchronization — for example "
     '*"What is a race condition?"* or *"Why must `pthread_cond_wait` be called in a `while` loop?"*'
 )
+
+LANGUAGE_FALLBACK_PREFIX = {
+    "Hindi using Devanagari script": "क्षमा करें—तकनीकी सटीकता के लिए मैं अभी English में उत्तर दे रहा हूँ।\n\n",
+    "Tamil using Tamil script": "மன்னிக்கவும்—தொழில்நுட்பத் துல்லியத்திற்காக நான் இப்போது English-ல் பதிலளிக்கிறேன்.\n\n",
+}
 
 _C_BLOCK = re.compile(r"```(?:c|C)?[ \t]*\r?\n(.*?)```", re.S)
 
@@ -52,8 +63,58 @@ class ChatRequest:
     verify_code: bool = True
 
 
+@dataclass
+class PreparedQuestion:
+    route: Route
+    question: str
+    answer_language: str | None = None
+    normalized: bool = False
+    check_answer: bool = False
+
+
 def complete_c_programs(text: str) -> list[str]:
     return [m.group(1) for m in _C_BLOCK.finditer(text) if re.search(r"\bint\s+main\s*\(", m.group(1))]
+
+
+def _clean_generated(text: str, n_sources: int) -> tuple[str, CitationStream]:
+    stream = CitationStream(n_sources)
+    stream.feed(text)
+    stream.flush()
+    return stream.text, stream
+
+
+def _repair_feedback(programs: list[str], reports: list[Any]) -> str | None:
+    if not programs:
+        return "No complete C program with int main(void) was present in a ```c block."
+    failures = [f"Program {i}: {r.summary}" for i, r in enumerate(reports, start=1) if r.status != "clean"]
+    for i, report in enumerate(reports, start=1):
+        findings = [finding.message for finding in getattr(report, "findings", [])]
+        if findings:
+            failures.append(f"Program {i} runtime findings: {'; '.join(findings[:8])}")
+        warnings = [finding.message for finding in getattr(report, "compiler", []) if finding.kind == "warning"]
+        if warnings:
+            failures.append(f"Program {i} compiler warnings: {'; '.join(warnings[:5])}")
+    return "\n".join(failures) or None
+
+
+def bug_review_hints(text: str) -> list[str]:
+    """Return high-confidence facts that keep a small model focused during code review."""
+    hints: list[str] = []
+    for match in re.finditer(r"pthread_mutex_lock\s*\(\s*&(?P<lock>\w+)\s*\)\s*;", text):
+        lock = match.group("lock")
+        tail = text[match.end() :]
+        unlock = re.search(rf"pthread_mutex_unlock\s*\(\s*&{re.escape(lock)}\s*\)\s*;", tail)
+        segment = tail[: unlock.start()] if unlock else tail
+        if re.search(r"\breturn\b", segment):
+            hints.append(f"A return path can leave mutex '{lock}' locked.")
+            break
+    if re.search(r"\bif\s*\([^)]*\)\s*(?:\{\s*)?pthread_cond_wait\s*\(", text, re.S):
+        hints.append("A condition-variable wait is guarded by if; it must re-check its predicate in a while loop.")
+    if re.search(
+        r"sem_wait\s*\(\s*&mutex\s*\)\s*;[\s\S]{0,200}?sem_wait\s*\(\s*&(empty|full)\s*\)", text
+    ):
+        hints.append("The code waits for an item/slot while holding mutex, creating hold-and-wait deadlock.")
+    return hints
 
 
 def source_card(n: int, r: Retrieved) -> dict[str, Any]:
@@ -104,31 +165,67 @@ class Pipeline:
         self.retriever = retriever or Retriever()
         self.checker = checker
 
-    async def _route(self, req: ChatRequest, model: str) -> tuple[Route, str]:
+    async def _collect(self, model: str, messages: list[dict[str, str]], options: dict[str, Any]) -> tuple[str, int]:
+        parts: list[str] = []
+        eval_count = 0
+        async for chunk in self.client.chat_stream(model, messages, options):
+            parts.append(chunk.get("message", {}).get("content", ""))
+            if chunk.get("done"):
+                eval_count += chunk.get("eval_count", 0)
+        return "".join(parts), eval_count
+
+    async def _route(self, req: ChatRequest) -> PreparedQuestion:
         history = req.history[-6:]
-        r = route(req.message, has_history=bool(history))
         question = req.message
+        language = response_language(req.message)
+        normalized = False
+        check_answer = is_check_answer(req.message, history)
+        aux_model = auxiliary_model()
+        # Normalizing a long code-review request can discard the code and change its
+        # route. Preserve code verbatim; prompts already isolate it from instructions.
+        if needs_normalization(req.message) and not contains_code(req.message):
+            question = await normalize_question(self.client, aux_model, req.message)
+            normalized = question != req.message
+        r = route(question, history=history)
         if r.followup:
-            question = await rewrite_followup(self.client, model, req.message, history)
-            r.mode = refine_followup(question) if r.mode == "concept" else r.mode
+            question = await rewrite_followup(self.client, aux_model, req.message, history)
+            if r.mode == "concept" and not check_answer:
+                r.mode = refine_followup(question)
         elif r.ambiguous:
-            label = await classify_ambiguous(self.client, model, req.message)
+            label = await classify_ambiguous(self.client, aux_model, question)
             r.mode = {"sync": "concept", "os": "os_out_of_scope", "greeting": "greeting", "other": "off_topic"}[label]
             r.needs_retrieval = r.mode == "concept"
             r.reason += f"; llm={label}"
-        return r, question
+        return PreparedQuestion(r, question, language, normalized, check_answer)
 
     async def run(self, req: ChatRequest) -> AsyncIterator[Event]:
         t0 = time.perf_counter()
         setup = req.setup if req.setup in SETUPS else self.cfg["setup"]
         use_rag = setup.endswith("_rag")
-        model = model_for_setup(setup)
+        requested_model = model_for_setup(setup)
 
         try:
-            r, question = await self._route(req, model)
+            prepared = await self._route(req)
+            r, question = prepared.route, prepared.question
         except OllamaError as exc:
             yield Event("error", {"message": str(exc), "kind": "ollama_unreachable"})
             return
+
+        # The teaching adapter was trained on English course data. For a detected
+        # non-English request, use the multilingual base model for the final answer
+        # as well as normalization; otherwise the adapter can loop or emit unrelated C.
+        language_fallback = prepared.answer_language is not None
+        normalized_fallback = prepared.normalized and setup.startswith("ft")
+        task_fallback = setup.startswith("ft") and r.mode in ("code_write", "bug_find")
+        base_fallback = language_fallback or normalized_fallback or task_fallback
+        model = auxiliary_model() if base_fallback else requested_model
+        fallback_reason = None
+        if language_fallback:
+            fallback_reason = "english_accuracy_fallback"
+        elif normalized_fallback:
+            fallback_reason = "normalized_prompt_base"
+        elif task_fallback:
+            fallback_reason = "code_safety_base"
 
         if r.mode == "empty":
             yield Event("meta", {"mode": "empty", "setup": setup, "rewritten_query": None, "followup": False})
@@ -153,7 +250,7 @@ class Pipeline:
             if best_score is None or best_score < threshold:
                 # Typos and instruction-heavy phrasing confuse the cross-encoder; retry with a cleaned query.
                 try:
-                    search_query_used = await search_query(self.client, model, question)
+                    search_query_used = await search_query(self.client, auxiliary_model(), question)
                 except OllamaError:
                     search_query_used = None
                 if search_query_used and search_query_used.lower() != query.lower():
@@ -178,6 +275,15 @@ class Pipeline:
             sources = [source_card(i, t) for i, t in enumerate(top, start=1)]
         retrieval_ms = round((time.perf_counter() - t_retrieval) * 1000)
 
+        review_evidence = bug_review_hints(req.message) if mode == "bug_find" else []
+        if mode == "bug_find" and self.checker is not None:
+            submitted_programs = complete_c_programs(req.message)
+            if submitted_programs:
+                submitted_reports = await self.checker.check_many(submitted_programs)
+                review_evidence.extend(
+                    f"Automated checker: {report.status} — {report.summary}" for report in submitted_reports
+                )
+
         yield Event(
             "meta",
             {
@@ -185,53 +291,118 @@ class Pipeline:
                 "route": r.mode,
                 "setup": setup,
                 "model": model,
+                "model_fallback": fallback_reason,
                 "followup": r.followup,
                 "rewritten_query": question if question != req.message else None,
                 "best_rerank_score": best_score,
                 "reason": r.reason,
                 "search_query": search_query_used,
+                "normalized": prepared.normalized,
+                "answer_language": prepared.answer_language,
+                "review_evidence": review_evidence,
             },
         )
         yield Event("sources", {"sources": sources})
 
         history = [] if r.mode in ("greeting", "off_topic") else req.history[-4:]
-        messages = build_messages(question, mode, chunks, history=history, followup=r.followup, topics=topics)
-        stream = CitationStream(len(sources))
+        messages = build_messages(
+            question,
+            mode,
+            chunks,
+            history=history,
+            followup=r.followup,
+            topics=topics,
+            answer_language=None if language_fallback else prepared.answer_language,
+            check_answer=prepared.check_answer,
+        )
+        if review_evidence:
+            messages[-1]["content"] += (
+                "\n\n<review_evidence>\n"
+                + "\n".join(f"- {item}" for item in review_evidence)
+                + "\n</review_evidence>\nUse this automated evidence as facts in the review; do not contradict it "
+                "or invent a different bug."
+            )
         ttft_ms: float | None = None
         t_gen = time.perf_counter()
         eval_count = 0
+        verify_ms = 0
+        reports: list[Any] = []
+        repair_count = 0
+        interactive_seed = self.cfg["seed"] if not req.session_id else secrets.randbelow(2**31)
+        option_overrides: dict[str, Any] = {"seed": interactive_seed}
+        if prepared.check_answer:
+            option_overrides["temperature"] = 0.0
+        options = decoding_options(mode, option_overrides)
+        language_prefix = LANGUAGE_FALLBACK_PREFIX.get(prepared.answer_language or "", "")
         try:
-            async for chunk in self.client.chat_stream(model, messages, decoding_options(mode)):
-                delta = chunk.get("message", {}).get("content", "")
-                if delta:
-                    if ttft_ms is None:
-                        ttft_ms = (time.perf_counter() - t0) * 1000
-                    out = stream.feed(delta)
-                    if out:
-                        yield Event("token", {"text": out})
-                if chunk.get("done"):
-                    eval_count = chunk.get("eval_count", 0)
+            buffered_code = mode == "code_write" and req.verify_code and self.checker is not None
+            if buffered_code:
+                raw, eval_count = await self._collect(model, messages, options)
+                raw = clean_external_answer(raw, "code_write")
+                answer, stream = _clean_generated(raw, len(sources))
+                answer = language_prefix + answer
+                programs = complete_c_programs(answer)
+                t_v = time.perf_counter()
+                reports = await self.checker.check_many(programs) if programs else []
+                feedback = _repair_feedback(programs, reports)
+                max_repairs = int(self.cfg.decoding.get("code_repair_attempts", 1))
+                while feedback and repair_count < max_repairs:
+                    repair_count += 1
+                    repair_messages = build_code_repair_messages(messages, answer, feedback)
+                    raw, used = await self._collect(
+                        model,
+                        repair_messages,
+                        decoding_options(mode, {"seed": (interactive_seed + repair_count) % (2**31)}),
+                    )
+                    eval_count += used
+                    raw = clean_external_answer(raw, "code_write")
+                    answer, stream = _clean_generated(raw, len(sources))
+                    answer = language_prefix + answer
+                    programs = complete_c_programs(answer)
+                    reports = await self.checker.check_many(programs) if programs else []
+                    feedback = _repair_feedback(programs, reports)
+                verify_ms = round((time.perf_counter() - t_v) * 1000)
+                ttft_ms = (time.perf_counter() - t0) * 1000
+                yield Event("token", {"text": answer})
+            else:
+                stream = CitationStream(len(sources))
+                if language_prefix:
+                    ttft_ms = (time.perf_counter() - t0) * 1000
+                    yield Event("token", {"text": language_prefix})
+                async for chunk in self.client.chat_stream(model, messages, options):
+                    delta = chunk.get("message", {}).get("content", "")
+                    if delta:
+                        if ttft_ms is None:
+                            ttft_ms = (time.perf_counter() - t0) * 1000
+                        out = stream.feed(delta)
+                        if out:
+                            yield Event("token", {"text": out})
+                    if chunk.get("done"):
+                        eval_count = chunk.get("eval_count", 0)
+                tail = stream.flush()
+                if tail:
+                    yield Event("token", {"text": tail})
+                answer = language_prefix + stream.text
         except OllamaError as exc:
             yield Event(
                 "error", {"message": str(exc), "kind": "ollama_unreachable" if "reach" in str(exc) else "ollama_error"}
             )
             return
-        tail = stream.flush()
-        if tail:
-            yield Event("token", {"text": tail})
-        answer = stream.text
         gen_ms = (time.perf_counter() - t_gen) * 1000
 
-        verify_ms = 0
-        programs = complete_c_programs(answer) if req.verify_code and self.checker is not None else []
-        if programs:
+        programs = (
+            complete_c_programs(answer)
+            if mode == "code_write" and req.verify_code and self.checker is not None
+            else []
+        )
+        if programs and not reports:
             t_v = time.perf_counter()
-            for idx in range(len(programs)):
-                yield Event("verification", {"block_index": idx, "status": "pending"})
             reports = await self.checker.check_many(programs)
-            for idx, report in enumerate(reports):
-                yield Event("verification", {"block_index": idx, "status": "done", "report": report.to_dict()})
             verify_ms = round((time.perf_counter() - t_v) * 1000)
+        for idx in range(len(programs)):
+            yield Event("verification", {"block_index": idx, "status": "pending"})
+        for idx, report in enumerate(reports):
+            yield Event("verification", {"block_index": idx, "status": "done", "report": report.to_dict()})
 
         valid_cites, invalid_cites = stream.counts()
         yield Event(
@@ -240,6 +411,7 @@ class Pipeline:
                 "mode": mode,
                 "cited": cited_numbers(answer, len(sources)),
                 "citations": {"valid": valid_cites, "invalid": invalid_cites},
+                "repair_attempts": repair_count,
                 "timings": {
                     "ttft_ms": round(ttft_ms) if ttft_ms is not None else None,
                     "retrieval_ms": retrieval_ms,

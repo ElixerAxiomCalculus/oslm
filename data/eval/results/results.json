@@ -1,380 +1,64 @@
 {
   "setups": {
-    "base": {
-      "n_testset": 119,
-      "n_probes": 38,
-      "correctness": 1.3949579831932772,
-      "correctness_by_category": {
-        "concept": 1.8,
-        "code_write": 1.05,
-        "bug_find": 1.3333333333333333
-      },
-      "grounding": null,
-      "citation_validity": 0.0,
-      "citation_rate": null,
-      "code": {
-        "compiles": 0.6,
-        "runs": 0.2,
-        "tsan_clean": 0.15,
-        "helgrind_clean": 0.15
-      },
-      "bug": {
-        "precision": 0.7857142857142857,
-        "recall": 0.7586206896551724,
-        "f1": 0.7719298245614034,
-        "tp": 22,
-        "fp": 6,
-        "fn": 7,
-        "tn": 4
-      },
-      "abstention": {
-        "correct_decline": 1.0,
-        "false_decline": 0.025
-      },
-      "speed": {
-        "ttft_p50": 401.5,
-        "ttft_p95": 999.0,
-        "total_p50": 10980.0,
-        "total_p95": 32573.149999999998
-      },
-      "retrieval": null
-    },
-    "base_rag": {
-      "n_testset": 119,
-      "n_probes": 38,
-      "correctness": 1.495798319327731,
-      "correctness_by_category": {
-        "concept": 1.95,
-        "code_write": 1.325,
-        "bug_find": 1.205128205128205
-      },
-      "grounding": 0.8732142857142857,
-      "citation_validity": 0.8591160220994475,
-      "citation_rate": 0.65,
-      "code": {
-        "compiles": 0.45,
-        "runs": 0.2,
-        "tsan_clean": 0.125,
-        "helgrind_clean": 0.1
-      },
-      "bug": {
-        "precision": 0.8,
-        "recall": 0.6896551724137931,
-        "f1": 0.7407407407407408,
-        "tp": 20,
-        "fp": 5,
-        "fn": 9,
-        "tn": 5
-      },
-      "abstention": {
-        "correct_decline": 0.75,
-        "false_decline": 0.05
-      },
-      "speed": {
-        "ttft_p50": 791.5,
-        "ttft_p95": 1824.6999999999994,
-        "total_p50": 7894.5,
-        "total_p95": 34474.7
-      },
-      "retrieval": {
-        "hit@4": 0.95,
-        "mrr": 0.9
-      }
-    },
     "ft": {
-      "n_testset": 119,
+      "n_testset": 0,
       "n_probes": 38,
-      "correctness": 0.957983193277311,
-      "correctness_by_category": {
-        "concept": 1.6,
-        "code_write": 0.45,
-        "bug_find": 0.8205128205128205
-      },
+      "correctness": null,
+      "correctness_by_category": {},
       "grounding": null,
       "citation_validity": 0.0,
       "citation_rate": null,
       "code": {
-        "compiles": 0.2,
-        "runs": 0.125,
-        "tsan_clean": 0.15,
-        "helgrind_clean": 0.125
+        "compiles": null,
+        "runs": null,
+        "tsan_clean": null,
+        "helgrind_clean": null
       },
       "bug": {
-        "precision": 0.7586206896551724,
-        "recall": 0.7586206896551724,
-        "f1": 0.7586206896551724,
-        "tp": 22,
-        "fp": 7,
-        "fn": 7,
-        "tn": 3
+        "precision": null,
+        "recall": null,
+        "f1": null,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0
       },
       "abstention": {
         "correct_decline": 1.0,
-        "false_decline": 0.0
+        "false_decline": null
       },
       "speed": {
-        "ttft_p50": 376.0,
-        "ttft_p95": 909.0999999999999,
-        "total_p50": 3836.0,
-        "total_p95": 26745.1
+        "ttft_p50": 470.0,
+        "ttft_p95": 39331.69999999994,
+        "total_p50": 4264.5,
+        "total_p95": 38209.5
       },
       "retrieval": null
-    },
-    "ft_rag": {
-      "n_testset": 119,
-      "n_probes": 38,
-      "correctness": 1.0252100840336134,
-      "correctness_by_category": {
-        "concept": 1.775,
-        "code_write": 0.35,
-        "bug_find": 0.9487179487179487
-      },
-      "grounding": 0.7222222222222222,
-      "citation_validity": 0.72,
-      "citation_rate": 0.1,
-      "code": {
-        "compiles": 0.225,
-        "runs": 0.1,
-        "tsan_clean": 0.075,
-        "helgrind_clean": 0.1
-      },
-      "bug": {
-        "precision": 0.76,
-        "recall": 0.6551724137931034,
-        "f1": 0.7037037037037037,
-        "tp": 19,
-        "fp": 6,
-        "fn": 10,
-        "tn": 4
-      },
-      "abstention": {
-        "correct_decline": 1.0,
-        "false_decline": 0.025
-      },
-      "speed": {
-        "ttft_p50": 768.0,
-        "ttft_p95": 1623.1999999999998,
-        "total_p50": 4169.0,
-        "total_p95": 28414.85
-      },
-      "retrieval": {
-        "hit@4": 0.925,
-        "mrr": 0.875
-      }
     }
   },
   "probes": {
-    "base": {
-      "by_category": {
-        "core": 1.0,
-        "typos": 1.0,
-        "terse": 1.0,
-        "long": 0.0,
-        "multi": 0.0,
-        "followup": 0.5,
-        "bug": 0.5,
-        "correct": 0.0,
-        "code": 0.0,
-        "trace": 0.5,
-        "os_out_of_scope": 1.0,
-        "off_topic": 1.0,
-        "injection": 1.0,
-        "false_premise": 1.0,
-        "trick": 1.0,
-        "non_english": 0.0,
-        "empty": 1.0,
-        "other_lang_code": 1.0
-      },
-      "overall": 0.6842105263157895,
-      "failures": [
-        {
-          "id": "long-1",
-          "failed": [
-            "mode"
-          ]
-        },
-        {
-          "id": "multi-1",
-          "failed": [
-            "contains_all"
-          ]
-        },
-        {
-          "id": "follow-1",
-          "failed": [
-            "judge"
-          ]
-        },
-        {
-          "id": "follow-2",
-          "failed": [
-            "program_clean"
-          ]
-        },
-        {
-          "id": "bug-1",
-          "failed": [
-            "judge"
-          ]
-        },
-        {
-          "id": "bug-2",
-          "failed": [
-            "contains_any",
-            "judge"
-          ]
-        },
-        {
-          "id": "correct-1",
-          "failed": [
-            "verdict",
-            "judge"
-          ]
-        },
-        {
-          "id": "code-1",
-          "failed": [
-            "program_clean"
-          ]
-        },
-        {
-          "id": "code-2",
-          "failed": [
-            "program_clean",
-            "judge"
-          ]
-        },
-        {
-          "id": "trace-1",
-          "failed": [
-            "judge"
-          ]
-        },
-        {
-          "id": "lang-1",
-          "failed": [
-            "language",
-            "judge"
-          ]
-        },
-        {
-          "id": "lang-2",
-          "failed": [
-            "language",
-            "judge"
-          ]
-        }
-      ]
-    },
-    "base_rag": {
-      "by_category": {
-        "core": 1.0,
-        "typos": 1.0,
-        "terse": 0.5,
-        "long": 0.0,
-        "multi": 1.0,
-        "followup": 0.75,
-        "bug": 0.75,
-        "correct": 0.0,
-        "code": 0.0,
-        "trace": 1.0,
-        "os_out_of_scope": 0.5,
-        "off_topic": 1.0,
-        "injection": 1.0,
-        "false_premise": 1.0,
-        "trick": 1.0,
-        "non_english": 0.0,
-        "empty": 1.0,
-        "other_lang_code": 1.0
-      },
-      "overall": 0.7368421052631579,
-      "failures": [
-        {
-          "id": "terse-2",
-          "failed": [
-            "judge"
-          ]
-        },
-        {
-          "id": "long-1",
-          "failed": [
-            "mode"
-          ]
-        },
-        {
-          "id": "follow-3",
-          "failed": [
-            "judge"
-          ]
-        },
-        {
-          "id": "bug-1",
-          "failed": [
-            "judge"
-          ]
-        },
-        {
-          "id": "correct-1",
-          "failed": [
-            "verdict",
-            "judge"
-          ]
-        },
-        {
-          "id": "code-1",
-          "failed": [
-            "program_clean"
-          ]
-        },
-        {
-          "id": "code-2",
-          "failed": [
-            "program_clean"
-          ]
-        },
-        {
-          "id": "oos-1",
-          "failed": [
-            "judge"
-          ]
-        },
-        {
-          "id": "lang-1",
-          "failed": [
-            "language",
-            "judge"
-          ]
-        },
-        {
-          "id": "lang-2",
-          "failed": [
-            "language"
-          ]
-        }
-      ]
-    },
     "ft": {
       "by_category": {
         "core": 1.0,
-        "typos": 0.3333333333333333,
+        "typos": 0.6666666666666666,
         "terse": 1.0,
-        "long": 0.0,
+        "long": 1.0,
         "multi": 1.0,
-        "followup": 0.75,
-        "bug": 0.0,
-        "correct": 0.0,
+        "followup": 1.0,
+        "bug": 1.0,
+        "correct": 1.0,
         "code": 0.0,
         "trace": 1.0,
         "os_out_of_scope": 1.0,
         "off_topic": 1.0,
         "injection": 1.0,
-        "false_premise": 0.0,
+        "false_premise": 1.0,
         "trick": 1.0,
-        "non_english": 0.0,
+        "non_english": 1.0,
         "empty": 1.0,
-        "other_lang_code": 0.5
+        "other_lang_code": 1.0
       },
-      "overall": 0.6052631578947368,
+      "overall": 0.9210526315789473,
       "failures": [
         {
           "id": "typo-1",
@@ -383,59 +67,6 @@
           ]
         },
         {
-          "id": "typo-2",
-          "failed": [
-            "judge"
-          ]
-        },
-        {
-          "id": "long-1",
-          "failed": [
-            "mode",
-            "contains_any",
-            "contains_all",
-            "judge"
-          ]
-        },
-        {
-          "id": "follow-2",
-          "failed": [
-            "program_clean"
-          ]
-        },
-        {
-          "id": "bug-1",
-          "failed": [
-            "judge"
-          ]
-        },
-        {
-          "id": "bug-2",
-          "failed": [
-            "contains_any",
-            "judge"
-          ]
-        },
-        {
-          "id": "bug-3",
-          "failed": [
-            "contains_any"
-          ]
-        },
-        {
-          "id": "bug-4",
-          "failed": [
-            "contains_any"
-          ]
-        },
-        {
-          "id": "correct-1",
-          "failed": [
-            "verdict",
-            "judge"
-          ]
-        },
-        {
           "id": "code-1",
           "failed": [
             "program_clean",
@@ -446,141 +77,6 @@
           "id": "code-2",
           "failed": [
             "program_clean"
-          ]
-        },
-        {
-          "id": "premise-1",
-          "failed": [
-            "judge"
-          ]
-        },
-        {
-          "id": "lang-1",
-          "failed": [
-            "language"
-          ]
-        },
-        {
-          "id": "lang-2",
-          "failed": [
-            "language"
-          ]
-        },
-        {
-          "id": "lang-code-2",
-          "failed": [
-            "judge"
-          ]
-        }
-      ]
-    },
-    "ft_rag": {
-      "by_category": {
-        "core": 1.0,
-        "typos": 0.6666666666666666,
-        "terse": 0.5,
-        "long": 0.0,
-        "multi": 1.0,
-        "followup": 0.75,
-        "bug": 0.5,
-        "correct": 0.0,
-        "code": 0.0,
-        "trace": 1.0,
-        "os_out_of_scope": 1.0,
-        "off_topic": 1.0,
-        "injection": 0.5,
-        "false_premise": 1.0,
-        "trick": 1.0,
-        "non_english": 0.0,
-        "empty": 1.0,
-        "other_lang_code": 0.5
-      },
-      "overall": 0.6578947368421053,
-      "failures": [
-        {
-          "id": "typo-2",
-          "failed": [
-            "judge"
-          ]
-        },
-        {
-          "id": "terse-2",
-          "failed": [
-            "judge"
-          ]
-        },
-        {
-          "id": "long-1",
-          "failed": [
-            "mode",
-            "contains_any",
-            "contains_all",
-            "judge"
-          ]
-        },
-        {
-          "id": "follow-2",
-          "failed": [
-            "program_clean",
-            "judge"
-          ]
-        },
-        {
-          "id": "bug-1",
-          "failed": [
-            "judge"
-          ]
-        },
-        {
-          "id": "bug-3",
-          "failed": [
-            "judge"
-          ]
-        },
-        {
-          "id": "correct-1",
-          "failed": [
-            "verdict",
-            "judge"
-          ]
-        },
-        {
-          "id": "code-1",
-          "failed": [
-            "program_clean",
-            "judge"
-          ]
-        },
-        {
-          "id": "code-2",
-          "failed": [
-            "program_clean"
-          ]
-        },
-        {
-          "id": "inj-2",
-          "failed": [
-            "verdict",
-            "judge"
-          ]
-        },
-        {
-          "id": "lang-1",
-          "failed": [
-            "language",
-            "judge"
-          ]
-        },
-        {
-          "id": "lang-2",
-          "failed": [
-            "language"
-          ]
-        },
-        {
-          "id": "lang-code-2",
-          "failed": [
-            "judge"
           ]
         }
       ]
@@ -590,25 +86,10 @@
     "n": 0
   },
   "headline": {
-    "base": {
-      "correctness": 1.3949579831932772,
-      "grounding": null,
-      "probes_overall": 0.6842105263157895
-    },
-    "base_rag": {
-      "correctness": 1.495798319327731,
-      "grounding": 0.8732142857142857,
-      "probes_overall": 0.7368421052631579
-    },
     "ft": {
-      "correctness": 0.957983193277311,
+      "correctness": null,
       "grounding": null,
-      "probes_overall": 0.6052631578947368
-    },
-    "ft_rag": {
-      "correctness": 1.0252100840336134,
-      "grounding": 0.7222222222222222,
-      "probes_overall": 0.6578947368421053
+      "probes_overall": 0.9210526315789473
     }
   }
 }

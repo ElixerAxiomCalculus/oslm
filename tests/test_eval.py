@@ -4,6 +4,8 @@ from pathlib import Path
 
 from oslm.eval.metrics import findings_paragraph, predicted_bug, probe_checks
 from oslm.eval.plots import make_plots
+from oslm.eval.run import invalidate_judgements
+from oslm.sft.store import read_jsonl, write_jsonl
 
 
 def raw(answer: str, mode: str = "concept", **kw) -> dict:
@@ -96,3 +98,20 @@ def test_plots_and_findings(tmp_path: Path) -> None:
     assert all(p.exists() and p.stat().st_size > 10_000 for p in paths)
     text = findings_paragraph(data, setups)
     assert "**ft_rag**" in text and "1.00 to 1.40" in text
+
+
+def test_force_invalidation_only_removes_selected_judgements(tmp_path: Path) -> None:
+    path = tmp_path / "judgements.jsonl"
+    write_jsonl(
+        path,
+        [
+            {"setup": "ft", "id": "probe-1"},
+            {"setup": "ft", "id": "test-1"},
+            {"setup": "base", "id": "probe-1"},
+        ],
+    )
+    assert invalidate_judgements(path, ["ft"], {"probe-1"}) == 1
+    assert read_jsonl(path) == [
+        {"setup": "ft", "id": "test-1"},
+        {"setup": "base", "id": "probe-1"},
+    ]

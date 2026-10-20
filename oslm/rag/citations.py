@@ -4,9 +4,10 @@ import re
 
 _CITATION = re.compile(r"\[(\d{1,2}(?:\s*[,;]\s*\d{1,2})*)\]")
 _CITATION_WITH_SPACE = re.compile(r"([ \t]?)\[(\d{1,2}(?:\s*[,;]\s*\d{1,2})*)\]")
+_CITATION_PLACEHOLDER = re.compile(r"[ \t]*\[(?:n|source|citation)\]", re.I)
 # A suffix that could still grow into a citation ("[1, 2"), a code fence ("``"), or whitespace that a
 # dropped citation would otherwise leave dangling before punctuation.
-_UNSAFE_TAIL = re.compile(r"([ \t]*\[[\d,; ]{0,12}|[ \t]+|`{1,2}|\r)$")
+_UNSAFE_TAIL = re.compile(r"([ \t]*\[(?:[\d,; ]{0,12}|[A-Za-z]{0,12})|[ \t]+|`{1,2}|\r)$")
 
 
 def clean_citations(text: str, n_sources: int) -> str:
@@ -17,7 +18,7 @@ def clean_citations(text: str, n_sources: int) -> str:
         valid = [n for n in dict.fromkeys(nums) if 1 <= n <= n_sources]
         return m.group(1) + "".join(f"[{n}]" for n in valid) if valid else ""
 
-    return _CITATION_WITH_SPACE.sub(repl, text)
+    return _CITATION_PLACEHOLDER.sub("", _CITATION_WITH_SPACE.sub(repl, text))
 
 
 def clean_outside_code(text: str, n_sources: int) -> str:

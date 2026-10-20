@@ -18,7 +18,7 @@ import numpy as np
 from oslm.config import load_config
 from oslm.rag.prompts import build_user_message
 from oslm.sft.generate import CONTENT_MODES, _context_for, _ctx, _mode_for, load_chunks
-from oslm.sft.store import append_jsonl, ids_in
+from oslm.sft.store import append_jsonl, ids_in, read_jsonl, write_jsonl
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +47,96 @@ ALIASES = {
 # Cosine between an answer sentence and a chunk (bge-large, normalized) above which the chunk supports it.
 CITE_THRESHOLD = 0.80
 _SENTENCE_END = re.compile(r"(?<=[.!?])(\s+)")
+_C_FENCE = re.compile(r"(```[cC][ \t]*\n)(.*?)(```)", re.S)
+_CK_DEFINITION = re.compile(r"^\s*static\s+void\s+ck\s*\([^\n]*\}\s*$", re.M)
+_LEGACY_MACRO = re.compile(r"^\s*#define\s+(?:SO|P|V)\s*\([^\n]*\n?", re.M)
+_PV_FUNCTION_START = re.compile(r"^\s*static\s+void\s+(?:P|V)\s*\([^)]*\)\s*\{", re.M)
+_HEADER_USE = {
+    "semaphore.h": r"\bsem_(?:t|init|wait|post|destroy|trywait)\b",
+    "stdatomic.h": r"\b(?:_Atomic|atomic_|memory_order)",
+    "stdio.h": r"\b(?:printf|fprintf|perror|puts|fputs)\s*\(",
+    "stdlib.h": r"\b(?:abort|exit|malloc|calloc|realloc|free|EXIT_)\b",
+    "assert.h": r"\bassert\s*\(",
+    "errno.h": r"\b(?:errno|EINTR|EAGAIN|ETIMEDOUT)\b",
+    "time.h": r"\b(?:timespec|clock_gettime|nanosleep|time_t|CLOCK_)\b",
+    "string.h": r"\b(?:memcpy|memset|strcpy|strcmp|strlen)\s*\(",
+    "stdbool.h": r"\b(?:bool|true|false)\b",
+    "stdint.h": r"\b(?:u?int(?:8|16|32|64)_t|SIZE_MAX)\b",
+    "limits.h": r"\b(?:INT_|LONG_|CHAR_|UINT_)\w*",
+    "sched.h": r"\b(?:sched_|cpu_set_t)\w*",
+    "signal.h": r"\b(?:signal|sigaction|SIG\w+)\b",
+}
+
+
+def _rewrite_calls(text: str, name: str, replacement: str) -> str:
+    """Rewrite helper(expr) while respecting nested parentheses."""
+    pattern = re.compile(rf"\b{re.escape(name)}\s*\(")
+    while match := pattern.search(text):
+        depth, end = 1, match.end()
+        while end < len(text) and depth:
+            depth += (text[end] == "(") - (text[end] == ")")
+            end += 1
+        if depth:
+            break
+        inner = text[match.end() : end - 1]
+        text = text[: match.start()] + replacement.format(expr=inner) + text[end:]
+    return text
+
+
+def _remove_pv_functions(text: str) -> tuple[str, bool]:
+    """Remove one-line or multi-line P/V helpers without consuming neighbouring functions."""
+    found = False
+    while match := _PV_FUNCTION_START.search(text):
+        found = True
+        depth, end = 1, match.end()
+        while end < len(text) and depth:
+            depth += (text[end] == "{") - (text[end] == "}")
+            end += 1
+        if depth:
+            break
+        if end < len(text) and text[end] == "\n":
+            end += 1
+        text = text[: match.start()] + text[end:]
+    return text, found
+
+
+def _compact_c_block(code: str) -> str:
+    code = re.sub(r"^\s*#define\s+_XOPEN_SOURCE\s+[^\n]+\n", "", code, flags=re.M)
+    code = _CK_DEFINITION.sub("", code)
+    code, pointer_pv = _remove_pv_functions(code)
+    code = _LEGACY_MACRO.sub("", code)
+    code = _rewrite_calls(code, "ck", "assert(({expr}) == 0)")
+    address = "{expr}" if pointer_pv else "&({expr})"
+    code = _rewrite_calls(code, "P", f"assert(sem_wait({address}) == 0)")
+    code = _rewrite_calls(code, "V", f"assert(sem_post({address}) == 0)")
+    code = _rewrite_calls(code, "SO", "assert(({expr}) != -1)")
+    if "assert(" in code and not re.search(r"^\s*#include\s*<assert\.h>", code, re.M):
+        code = "#include <assert.h>\n" + code
+    body = re.sub(r"^\s*#include\s*<[^>]+>\s*$", "", code, flags=re.M)
+    for header, token in _HEADER_USE.items():
+        if not re.search(token, body):
+            code = re.sub(rf"^\s*#include\s*<{re.escape(header)}>\s*\n?", "", code, flags=re.M)
+    return re.sub(r"\n{3,}", "\n\n", code).strip() + "\n"
+
+
+def clean_external_answer(answer: str, category: str) -> str:
+    """Remove the repetitive code scaffold that the first adapter memorised."""
+    if category != "code_write":
+        return answer
+
+    def compact(match: re.Match[str]) -> str:
+        return match.group(1) + _compact_c_block(match.group(2)) + match.group(3)
+
+    answer = _C_FENCE.sub(compact, answer)
+    answer = answer.replace("gcc -Wall -pthread prog.c", "gcc -Wall -Wextra -pthread prog.c")
+    answer = answer.replace("gcc -fsanitize=thread -g -pthread prog.c", "gcc -fsanitize=thread -g -O1 -pthread prog.c")
+    answer = re.sub(
+        r"\s*The second build requires a compiler/platform with ThreadSanitizer support\."
+        r"(?: The example uses finite work and no intentional delays; runtime assumes ordinary scheduler progress\.)?",
+        "",
+        answer,
+    )
+    return answer.strip()
 
 
 def _norm_category(raw: str) -> str:
@@ -75,6 +165,7 @@ def read_rows(path: Path) -> tuple[list[dict[str, Any]], list[str]]:
             except ValueError as exc:
                 problems.append(f"line {n}: {exc}")
                 continue
+            row["answer"] = clean_external_answer(row["answer"], row["category"])
             hb = row.get("has_bug", "").lower()
             row["has_bug"] = True if hb in ("true", "yes", "1") else False if hb in ("false", "no", "0") else None
             rows.append(row)
@@ -138,15 +229,28 @@ async def _rewrite_all(followups: list[tuple[list[dict[str, str]], str]]) -> lis
         await client.aclose()
 
 
-def import_csv(path: Path) -> dict[str, Any]:
+def import_csv(path: Path, replace: bool = False) -> dict[str, Any]:
     import asyncio
 
-    from oslm.rag.router import refine_followup, route
+    from oslm.rag.router import is_check_answer, refine_followup, route
 
     cfg = load_config()
     out = cfg.path("sft") / "raw" / "answers.jsonl"
-    done = ids_in(out)
     rows, problems = read_rows(path)
+    if replace and out.exists():
+        questions = {r["question"] for r in rows}
+        questions.update(parsed[1] for r in rows if (parsed := parse_followup(r["question"])))
+        existing = [
+            it
+            for it in read_jsonl(out)
+            if it.get("source_csv") != path.name
+            and not (
+                str(it.get("variant", "")).startswith("external")
+                and (it.get("source_question") in questions or it.get("question") in questions)
+            )
+        ]
+        write_jsonl(out, existing)
+    done = ids_in(out)
     chunks_by_id = {c["chunk_id"]: c for c in load_chunks()}
     k = cfg.sft["context_chunks"]
     new = []
@@ -154,7 +258,7 @@ def import_csv(path: Path) -> dict[str, Any]:
 
     pending = []
     for row in rows:
-        row["id"] = "ext-" + hashlib.sha1((row["question"] + "||" + row["answer"]).encode("utf-8")).hexdigest()[:12]
+        row["id"] = "ext-" + hashlib.sha1((path.name + "||" + row["question"]).encode("utf-8")).hexdigest()[:12]
         if row["category"] == "followup" and row["id"] not in done:
             parsed = parse_followup(row["question"])
             if parsed is None:
@@ -175,9 +279,11 @@ def import_csv(path: Path) -> dict[str, Any]:
             continue
         cat = row["category"]
         followup = cat == "followup"
+        check_answer = False
         if followup:
-            r = route(row["followup_msg"], has_history=True)
-            mode = refine_followup(row["rewritten"]) if r.mode == "concept" else r.mode
+            r = route(row["followup_msg"], history=row["history"])
+            check_answer = is_check_answer(row["followup_msg"], row["history"])
+            mode = refine_followup(row["rewritten"]) if r.mode == "concept" and not check_answer else r.mode
             search_text = row["rewritten"]
         else:
             intended = cat if cat in CONTENT_MODES + ("off_topic", "os_out_of_scope", "greeting") else "concept"
@@ -207,9 +313,17 @@ def import_csv(path: Path) -> dict[str, Any]:
             "question": row["followup_msg"] if followup else row["question"],
             "mode": mode,
             "chunk_ids": [c["chunk_id"] for c in picked] if picked is not None else None,
-            "user_message": build_user_message(search_text, mode, context, followup=followup),
+            "user_message": build_user_message(
+                search_text,
+                mode,
+                context,
+                followup=followup,
+                check_answer=check_answer,
+            ),
             "note": "",
             "answer": answer,
+            "source_csv": path.name,
+            "source_question": row["question"],
         }
         if followup:
             item["history"] = row["history"]

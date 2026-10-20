@@ -13,7 +13,7 @@ from typing import Any
 
 from oslm.config import load_config
 from oslm.rag.prompts import SYSTEM_PROMPT, ContextChunk, build_user_message
-from oslm.rag.router import refine_followup, route
+from oslm.rag.router import is_check_answer, refine_followup, route
 from oslm.sft.llm import Gemini, GeminiError, LocalQwen, items_of
 from oslm.sft.store import append_jsonl, ids_in, read_jsonl
 
@@ -652,10 +652,18 @@ async def build_multiturn(answers: list[dict[str, Any]], out: Path, plan: dict[s
             follow = rng.choice(FOLLOWUPS[base["category"]])
             history = [{"role": "user", "content": base["question"]}, {"role": "assistant", "content": base["answer"]}]
             rewritten = await rewrite_followup(client, model_for_setup("base"), follow, history)
-            r = route(follow, has_history=True)
-            mode = refine_followup(rewritten) if r.mode == "concept" else r.mode
+            r = route(follow, history=history)
+            mode = (
+                refine_followup(rewritten) if r.mode == "concept" and not is_check_answer(follow, history) else r.mode
+            )
             picked, _ = _context_for(rewritten, mode, chunks_by_id, cfg.sft["context_chunks"])
-            msg = build_user_message(rewritten, mode, [_ctx(c) for c in picked], followup=True)
+            msg = build_user_message(
+                rewritten,
+                mode,
+                [_ctx(c) for c in picked],
+                followup=True,
+                check_answer=is_check_answer(follow, history),
+            )
             rows.append(
                 {
                     "id": _hid("mt", base["id"], follow),

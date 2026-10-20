@@ -113,7 +113,9 @@ def run_sft(
         logging.getLogger(noisy).setLevel(logging.WARNING)
     cfg = load_config()
     p = _paths()
-    if force and step in ("verify", "format", "review", "all"):
+    # Formatting and review consume the verifier output, so --force must not erase it.
+    # Only steps that actually recreate verified.jsonl may remove the old file.
+    if force and step in ("verify", "all"):
         for key in ("verified",):
             p[key].unlink(missing_ok=True)  # type: ignore[attr-defined]
 
@@ -137,7 +139,7 @@ def run_sft(
 
         if not csv_path:
             raise SystemExit("--step import needs --csv <file>")
-        print(json.dumps(import_csv(Path(csv_path)), indent=2))
+        print(json.dumps(import_csv(Path(csv_path), replace=force), indent=2))
         return 0
 
     if step in ("verify", "all"):

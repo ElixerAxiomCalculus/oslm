@@ -50,9 +50,10 @@ retrieval:
 decoding:
   temperature: 0.2
   top_p: 0.9
-  repeat_penalty: 1.05
-  max_tokens: 1200
-  max_tokens_code: 2000
+  repeat_penalty: 1.12
+  max_tokens: 800
+  max_tokens_code: 2400
+  code_repair_attempts: 3  # bounded checker-guided retries before a code answer is shown
 
 api:
   host: 127.0.0.1

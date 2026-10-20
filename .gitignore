@@ -1,5 +1,7 @@
 # secrets
 .env
+.env.*
+!.env.example
 
 # python
 .venv/
@@ -10,11 +12,16 @@ __pycache__/
 .pytest_tmp/
 .ruff_cache/
 .mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 *.egg-info/
 
 # node / frontend
 node_modules/
 web/dist/
+web/.vite/
 web/playwright-report/
 web/test-results/
 web/blob-report/
@@ -39,6 +46,10 @@ tools/
 *.gguf
 *.safetensors
 *.bin
+*.ckpt
+*.onnx
+*.pt
+*.pth
 
 # logs
 logs/
@@ -52,3 +63,7 @@ desktop.ini
 .idea/
 
 CONTEXT.md
+
+# personal build notes
+OSLM_WHAT_WENT_WRONG.txt
+OSLM_DATASETS_METRICS_IMPROVEMENTS.txt

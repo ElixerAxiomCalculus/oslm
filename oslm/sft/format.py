@@ -40,6 +40,9 @@ def _normalise(text: str) -> str:
 
 def near_duplicates(keys: list[str], refs: list[str], threshold: float) -> tuple[set[int], set[int]]:
     """Returns (indices duplicated within `keys`, indices too close to any of `refs`)."""
+    if not keys:
+        return set(), set()
+
     from oslm.index.embed import embed_passages
 
     vecs = embed_passages(keys)
